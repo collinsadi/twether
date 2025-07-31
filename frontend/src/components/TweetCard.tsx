@@ -13,6 +13,7 @@ interface TweetCardProps {
     replies: number;
     category: string;
     url?: string;
+    image?: string;
   };
 }
 
@@ -68,9 +69,27 @@ export const TweetCard = ({ tweet }: TweetCardProps) => {
       </div>
 
       {/* Tweet Content */}
-      <p className="text-white leading-relaxed mb-4 sm:mb-6 text-sm sm:text-base">
+      <p className="text-white leading-relaxed mb-4 text-sm sm:text-base">
         {tweet.content}
       </p>
+
+      {/* Image Preview */}
+      {tweet.image && (
+        <div className="mb-4">
+          <div className="relative overflow-hidden rounded-xl bg-white/5 border border-white/10">
+            <img
+              src={tweet.image}
+              alt="Tweet preview"
+              className="w-full h-48 sm:h-56 object-cover transition-transform duration-300 group-hover:scale-105"
+              onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                target.style.display = 'none';
+              }}
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+          </div>
+        </div>
+      )}
 
       {/* Hover effect border */}
       <div className="absolute inset-0 rounded-2xl border border-white/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />

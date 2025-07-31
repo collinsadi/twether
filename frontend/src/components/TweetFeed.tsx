@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { TweetCard } from './TweetCard';
+import { TweetSkeletonGrid } from './TweetSkeleton';
 
 interface Tweet {
   id: number;
@@ -13,6 +14,7 @@ interface Tweet {
   replies: number;
   category: string;
   url?: string;
+  image?: string;
 }
 
 interface TweetFeedProps {
@@ -41,7 +43,21 @@ const generateMockTweets = (count: number, filter?: string): Tweet[] => {
     'zkSync Era is revolutionizing Ethereum scaling with zero-knowledge rollups! 🚀'
   ];
 
-  return Array.from({ length: count }, (_, i) => ({
+  // Mock images for variety
+  const mockImages = [
+    'https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=800&h=600&fit=crop',
+    'https://images.unsplash.com/photo-1620321023374-d1a68fbc720d?w=800&h=600&fit=crop',
+    'https://images.unsplash.com/photo-1518186285589-2f7649de83e0?w=800&h=600&fit=crop',
+    'https://images.unsplash.com/photo-1639762681057-408e52192e55?w=800&h=600&fit=crop',
+    'https://images.unsplash.com/photo-1620321023374-d1a68fbc720d?w=800&h=600&fit=crop',
+    'https://images.unsplash.com/photo-1518186285589-2f7649de83e0?w=800&h=600&fit=crop',
+    'https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=800&h=600&fit=crop',
+    'https://images.unsplash.com/photo-1620321023374-d1a68fbc720d?w=800&h=600&fit=crop',
+    'https://images.unsplash.com/photo-1518186285589-2f7649de83e0?w=800&h=600&fit=crop',
+    'https://images.unsplash.com/photo-1639762681057-408e52192e55?w=800&h=600&fit=crop'
+  ];
+
+  const tweets = Array.from({ length: count }, (_, i) => ({
     id: Date.now() + i,
     author: authors[Math.floor(Math.random() * authors.length)],
     handle: `@${authors[Math.floor(Math.random() * authors.length)].toLowerCase().replace(/\s+/g, '')}`,
@@ -51,13 +67,23 @@ const generateMockTweets = (count: number, filter?: string): Tweet[] => {
     retweets: Math.floor(Math.random() * 500) + 10,
     replies: Math.floor(Math.random() * 100) + 5,
     category: filter && filter !== 'all' ? filter : categories[Math.floor(Math.random() * categories.length)],
-    url: Math.random() > 0.5 ? 'https://twitter.com' : undefined
+    url: Math.random() > 0.5 ? 'https://twitter.com' : undefined,
+    image: Math.random() > 0.6 ? mockImages[Math.floor(Math.random() * mockImages.length)] : undefined
   }));
+
+  // Ensure at least one tweet has an image
+  if (!tweets.some(tweet => tweet.image)) {
+    const randomIndex = Math.floor(Math.random() * tweets.length);
+    tweets[randomIndex].image = mockImages[Math.floor(Math.random() * mockImages.length)];
+  }
+
+  return tweets;
 };
 
 export const TweetFeed = ({ searchQuery, activeFilter }: TweetFeedProps) => {
   const [tweets, setTweets] = useState<Tweet[]>([]);
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
   const [page, setPage] = useState(1);
 
@@ -66,6 +92,7 @@ export const TweetFeed = ({ searchQuery, activeFilter }: TweetFeedProps) => {
     setTweets([]);
     setPage(1);
     setHasMore(true);
+    setInitialLoading(true);
     loadTweets();
   }, [searchQuery, activeFilter]);
 
@@ -91,6 +118,7 @@ export const TweetFeed = ({ searchQuery, activeFilter }: TweetFeedProps) => {
     setPage(prev => prev + 1);
     setHasMore(filteredTweets.length === 10);
     setLoading(false);
+    setInitialLoading(false);
   }, [searchQuery, activeFilter, loading, hasMore]);
 
   // Infinite scroll handler
@@ -104,6 +132,15 @@ export const TweetFeed = ({ searchQuery, activeFilter }: TweetFeedProps) => {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, [loadTweets]);
+
+  // Show skeleton loader for initial load
+  if (initialLoading) {
+    return (
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-8">
+        <TweetSkeletonGrid count={6} />
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-8">
@@ -127,14 +164,14 @@ export const TweetFeed = ({ searchQuery, activeFilter }: TweetFeedProps) => {
         )}
       </AnimatePresence>
 
-      {/* Loading indicator */}
+      {/* Loading indicator for more tweets */}
       {loading && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           className="flex justify-center py-6 sm:py-8"
         >
-          <div className="loading-spinner" />
+          <TweetSkeletonGrid count={4} />
         </motion.div>
       )}
 
