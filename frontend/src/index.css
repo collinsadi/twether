@@ -1,0 +1,58 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-white/5;
+  }
+  
+  body {
+    @apply bg-black text-white font-sans;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+  
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@layer components {
+  .tweet-card {
+    @apply bg-black border border-white/5 p-6 transition-all duration-300 hover:border-white/10;
+  }
+  
+  .search-input {
+    @apply bg-black border border-white/10 text-white placeholder-gray-500 px-4 py-3 rounded-lg focus:outline-none focus:border-white/20 transition-all duration-300;
+  }
+  
+  .filter-button {
+    @apply bg-black border border-white/10 text-gray-400 hover:text-white hover:border-white/20 px-4 py-2 rounded-lg transition-all duration-300;
+  }
+  
+  .filter-button-active {
+    @apply bg-white/5 border-white/20 text-white;
+  }
+  
+  .loading-spinner {
+    @apply w-6 h-6 border-2 border-white/20 border-t-white rounded-full animate-spin;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-black;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-white/10 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-white/20;
+}
