@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { TweetCard } from "./TweetCard";
 import { TweetSkeletonGrid } from "./TweetSkeleton";
@@ -17,45 +17,73 @@ export const TweetFeed = ({ searchQuery, activeFilter }: TweetFeedProps) => {
   const [hasMore, setHasMore] = useState(true);
   const [page, setPage] = useState(1);
   const [error, setError] = useState<string | null>(null);
+  
+  // Use refs to track current state without causing re-renders
+  const currentPageRef = useRef(1);
+  const currentFilterRef = useRef(activeFilter);
+  const currentSearchRef = useRef(searchQuery);
 
-  // Load initial tweets
+  // Reset pagination when filters or search change
   useEffect(() => {
     setTweets([]);
     setPage(1);
+    currentPageRef.current = 1;
     setHasMore(true);
     setInitialLoading(true);
     setError(null);
-    loadTweets();
+    currentFilterRef.current = activeFilter;
+    currentSearchRef.current = searchQuery;
+    
+    // Load initial tweets
+    loadTweets(true);
   }, [searchQuery, activeFilter]);
 
-  const loadTweets = useCallback(async () => {
-    if (loading || !hasMore) return;
+  const loadTweets = useCallback(async (isInitialLoad = false) => {
+    if (loading || (!hasMore && !isInitialLoad)) return;
 
     setLoading(true);
     setError(null);
 
     try {
-      const response = await apiService.getTweets(page, 20, activeFilter);
+      const currentPage = isInitialLoad ? 1 : currentPageRef.current;
+      console.log('🔄 Loading tweets:', {
+        page: currentPage,
+        filter: currentFilterRef.current,
+        search: currentSearchRef.current,
+        isInitialLoad
+      });
+      
+      const response = await apiService.getTweets(currentPage, 20, currentFilterRef.current);
+
+      console.log('📡 API Response:', response);
 
       if (response.success) {
         const newTweets = response.data.tweets;
 
-        // Filter by search query if provided
-        const filteredTweets = searchQuery
+        // Filter by search query on client side since backend doesn't support search
+        const filteredTweets = currentSearchRef.current
           ? newTweets.filter(
               (tweet) =>
                 tweet.tweetText
                   .toLowerCase()
-                  .includes(searchQuery.toLowerCase()) ||
+                  .includes(currentSearchRef.current.toLowerCase()) ||
                 tweet.authorName
                   .toLowerCase()
-                  .includes(searchQuery.toLowerCase()) ||
-                tweet.username.toLowerCase().includes(searchQuery.toLowerCase())
+                  .includes(currentSearchRef.current.toLowerCase()) ||
+                tweet.username.toLowerCase().includes(currentSearchRef.current.toLowerCase())
             )
           : newTweets;
 
-        setTweets((prev) => [...prev, ...filteredTweets]);
-        setPage((prev) => prev + 1);
+        if (isInitialLoad) {
+          setTweets(filteredTweets);
+          setPage(2);
+          currentPageRef.current = 2;
+        } else {
+          setTweets((prev) => [...prev, ...filteredTweets]);
+          setPage((prev) => prev + 1);
+          currentPageRef.current = currentPage + 1;
+        }
+        
         setHasMore(response.data.pagination.hasNextPage);
       } else {
         setError(response.message || "Failed to load tweets");
@@ -67,7 +95,7 @@ export const TweetFeed = ({ searchQuery, activeFilter }: TweetFeedProps) => {
       setLoading(false);
       setInitialLoading(false);
     }
-  }, [searchQuery, activeFilter, loading, hasMore, page]);
+  }, [loading, hasMore]);
 
   // Infinite scroll handler
   useEffect(() => {
@@ -76,7 +104,7 @@ export const TweetFeed = ({ searchQuery, activeFilter }: TweetFeedProps) => {
         window.innerHeight + document.documentElement.scrollTop >=
         document.documentElement.offsetHeight - 1000
       ) {
-        loadTweets();
+        loadTweets(false);
       }
     };
 
@@ -108,9 +136,10 @@ export const TweetFeed = ({ searchQuery, activeFilter }: TweetFeedProps) => {
                 setError(null);
                 setTweets([]);
                 setPage(1);
+                currentPageRef.current = 1;
                 setHasMore(true);
                 setInitialLoading(true);
-                loadTweets();
+                loadTweets(true);
               }}
               className="px-4 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-colors"
             >
@@ -126,7 +155,9 @@ export const TweetFeed = ({ searchQuery, activeFilter }: TweetFeedProps) => {
             <p className="text-gray-500 text-base sm:text-lg">
               {searchQuery
                 ? `No tweets found for "${searchQuery}"`
-                : "No tweets available"}
+                : activeFilter !== 'all' 
+                  ? `No tweets found for topic "${activeFilter}"`
+                  : "No tweets available"}
             </p>
           </motion.div>
         ) : (

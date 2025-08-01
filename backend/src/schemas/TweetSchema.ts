@@ -21,7 +21,9 @@ const TweetSchema: Schema = new Schema({
   twitterId: {
     type: String,
     trim: true,
-    sparse: true // Allows multiple null values
+    sparse: true,
+    index: true,
+    unique: true
   },
   tweetText: {
     type: String,
@@ -59,8 +61,7 @@ const TweetSchema: Schema = new Schema({
   tweetUrl: {
     type: String,
     required: true,
-    trim: true,
-    unique: true
+    trim: true
   },
   mediaPreviewUrl: {
     type: String,
@@ -90,11 +91,9 @@ const TweetSchema: Schema = new Schema({
 });
 
 // Indexes for better query performance
-TweetSchema.index({ username: 1 });
 TweetSchema.index({ createdAtDate: -1 });
 TweetSchema.index({ isVerified: 1 });
 TweetSchema.index({ tweetUrl: 1 }, { unique: true });
-TweetSchema.index({ twitterId: 1 }, { unique: true, sparse: true });
 
 // Text index for search functionality
 TweetSchema.index({ 

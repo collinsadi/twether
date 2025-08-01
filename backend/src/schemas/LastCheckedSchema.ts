@@ -26,7 +26,6 @@ const LastCheckedSchema: Schema = new Schema({
 });
 
 // Indexes for better query performance
-LastCheckedSchema.index({ username: 1 }, { unique: true });
 LastCheckedSchema.index({ lastCheckedAt: -1 });
 
 export const LastChecked = mongoose.model<ILastChecked>('LastChecked', LastCheckedSchema); 

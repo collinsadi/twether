@@ -26,9 +26,17 @@ class TweetController {
       
       // Build query filter
       const filter: any = {};
-      if (topic) {
-        filter.topics = { $in: [topic] };
+      if (topic && topic !== 'all') {
+        // Check if the topic exists in the topics array (case-insensitive)
+        filter.topics = { 
+          $elemMatch: { 
+            $regex: new RegExp(`^${topic}$`, 'i') 
+          } 
+        };
       }
+      
+      console.log('🔍 Filter:', JSON.stringify(filter, null, 2));
+      console.log('📄 Page:', page, 'Limit:', limit, 'Topic:', topic);
       
       // Fetch tweets from database with pagination and filtering
       const tweets = await Tweet.find(filter)
@@ -36,6 +44,8 @@ class TweetController {
         .skip(skip)
         .limit(limit)
         .lean();
+      
+      console.log('📊 Found tweets:', tweets.length);
       
       // Get total count for pagination info
       const totalTweets = await Tweet.countDocuments(filter);
