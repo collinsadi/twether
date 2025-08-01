@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { TweetCard } from "./TweetCard";
 import { TweetSkeletonGrid } from "./TweetSkeleton";
 import { apiService } from "../services/api";
+import { socketService } from "../services/socket";
 import type { Tweet } from "../services/api";
 
 interface TweetFeedProps {
@@ -17,11 +18,44 @@ export const TweetFeed = ({ searchQuery, activeFilter }: TweetFeedProps) => {
   const [hasMore, setHasMore] = useState(true);
   const [page, setPage] = useState(1);
   const [error, setError] = useState<string | null>(null);
+  const [newTweetNotification, setNewTweetNotification] = useState<string | null>(null);
   
   // Use refs to track current state without causing re-renders
   const currentPageRef = useRef(1);
   const currentFilterRef = useRef(activeFilter);
   const currentSearchRef = useRef(searchQuery);
+
+  // Connect to Socket.IO for real-time updates
+  useEffect(() => {
+    socketService.connect();
+
+    // Listen for new tweets
+    const handleNewTweet = (newTweet: Tweet) => {
+      // Check if the tweet matches current filters
+      const matchesSearch = !currentSearchRef.current || 
+        newTweet.tweetText.toLowerCase().includes(currentSearchRef.current.toLowerCase()) ||
+        newTweet.authorName.toLowerCase().includes(currentSearchRef.current.toLowerCase()) ||
+        newTweet.username.toLowerCase().includes(currentSearchRef.current.toLowerCase());
+      
+      const matchesFilter = currentFilterRef.current === 'all' || 
+        newTweet.topics.includes(currentFilterRef.current);
+
+      if (matchesSearch && matchesFilter) {
+        // Add new tweet to the beginning of the list
+        setTweets(prev => [newTweet, ...prev]);
+        
+        // Show notification
+        setNewTweetNotification(`New tweet from @${newTweet.username}`);
+        setTimeout(() => setNewTweetNotification(null), 3000);
+      }
+    };
+
+    socketService.on('newTweet', handleNewTweet);
+
+    return () => {
+      socketService.off('newTweet', handleNewTweet);
+    };
+  }, []);
 
   // Reset pagination when filters or search change
   useEffect(() => {
@@ -123,6 +157,22 @@ export const TweetFeed = ({ searchQuery, activeFilter }: TweetFeedProps) => {
 
   return (
     <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-8">
+      {/* Real-time notification */}
+      <AnimatePresence>
+        {newTweetNotification && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="mb-4 p-3 bg-green-500/20 border border-green-500/30 rounded-lg text-green-400 text-sm text-center"
+          >
+            🎉 {newTweetNotification}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+
+
       <AnimatePresence mode="wait">
         {error ? (
           <motion.div

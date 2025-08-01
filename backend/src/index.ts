@@ -13,10 +13,11 @@ dotenv.config();
 
 const app = express();
 const httpServer = createServer(app);
-const io = new Server(httpServer, {
+export const io = new Server(httpServer, {
   cors: {
-    origin: "",
+    origin: process.env.FRONTEND_URL || "http://localhost:5173",
     methods: ["GET", "POST"],
+    credentials: true,
   },
 });
 
@@ -27,6 +28,9 @@ app.use(express.json());
 
 // Initialize services
 const tweetService = TweetMonitoringService.getInstance();
+
+// Set Socket.IO instance for real-time emissions
+tweetService.setSocketIO(io);
 
 // Setup cron job to fetch tweets every 10 minutes
 cron.schedule('*/10 * * * *', async () => {
@@ -50,6 +54,15 @@ app.get("/api/health", (req: Request, res: Response) => {
 
 // Tweet routes
 app.use("/api/tweets", tweetRoutes);
+
+// Socket.IO connection handling
+io.on('connection', (socket) => {
+  console.log(`🔌 Client connected: ${socket.id}`);
+  
+  socket.on('disconnect', () => {
+    console.log(`🔌 Client disconnected: ${socket.id}`);
+  });
+});
 
 httpServer.listen(ENVIRONMENT.APP.PORT, async () => {
   console.log(

@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Filter, X } from 'lucide-react';
+import { Search, Filter, X, Wifi, WifiOff } from 'lucide-react';
 import { FaFeatherAlt } from "react-icons/fa";
 import { apiService } from '../services/api';
+import { socketService } from '../services/socket';
 
 interface MinimalHeaderProps {
   onSearch: (query: string) => void;
@@ -22,6 +23,7 @@ export const MinimalHeader = ({ onSearch, onFilterChange, activeFilter }: Minima
     { id: 'all', label: 'All' }
   ]);
   const [loadingTopics, setLoadingTopics] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
 
   // Fetch topics from API
   useEffect(() => {
@@ -59,6 +61,21 @@ export const MinimalHeader = ({ onSearch, onFilterChange, activeFilter }: Minima
     fetchTopics();
   }, []);
 
+  // Monitor Socket.IO connection status
+  useEffect(() => {
+    const checkConnection = () => {
+      setIsConnected(socketService.isConnected());
+    };
+
+    // Check initial connection status
+    checkConnection();
+
+    // Set up interval to check connection status
+    const interval = setInterval(checkConnection, 2000);
+
+    return () => clearInterval(interval);
+  }, []);
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     onSearch(searchQuery);
@@ -83,6 +100,13 @@ export const MinimalHeader = ({ onSearch, onFilterChange, activeFilter }: Minima
               <FaFeatherAlt className="w-4 h-4 sm:w-5 sm:h-5 text-black" />
             </div>
             <span className="text-lg sm:text-xl font-semibold">Twether</span>
+            <div className="flex items-center space-x-1">
+              {isConnected ? (
+                <Wifi className="w-4 h-4 text-green-400" />
+              ) : (
+                <WifiOff className="w-4 h-4 text-gray-500" />
+              )}
+            </div>
           </div>
           
           <form onSubmit={handleSearch} className="flex-1 max-w-sm sm:max-w-md mx-3 sm:mx-8">

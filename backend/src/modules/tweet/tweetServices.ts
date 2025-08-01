@@ -4,6 +4,7 @@ import * as path from "path";
 import { Tweet } from "../../schemas/TweetSchema";
 import { LastChecked } from "../../schemas/LastCheckedSchema";
 import { analyzeTweet } from "../llm/gemini";
+import { Server as SocketIOServer } from "socket.io";
 
 interface Tweet {
   id: string;
@@ -91,6 +92,7 @@ export class TweetMonitoringService {
   private lastCheckedCache: Map<string, Date> = new Map();
   private rateLimitDelay = 1000; // 1 second delay between API calls
   private batchSize = 10; // Process tweets in batches for AI analysis
+  private io: SocketIOServer | null = null;
 
   private constructor() {}
 
@@ -99,6 +101,23 @@ export class TweetMonitoringService {
       TweetMonitoringService.instance = new TweetMonitoringService();
     }
     return TweetMonitoringService.instance;
+  }
+
+  /**
+   * Set Socket.IO instance for real-time emissions
+   */
+  public setSocketIO(io: SocketIOServer): void {
+    this.io = io;
+  }
+
+  /**
+   * Emit tweet to connected clients
+   */
+  private emitTweet(tweet: SimplifiedTweet): void {
+    if (this.io) {
+      this.io.emit('newTweet', tweet);
+      console.log(`📡 Emitted new tweet: ${tweet.tweetText.substring(0, 50)}...`);
+    }
   }
 
   /**
@@ -254,6 +273,10 @@ export class TweetMonitoringService {
             (analysis.sentiment === "positive" || analysis.sentiment === "neutral")
           ) {
             tweet.topics = analysis.topics;
+            
+            // Emit tweet in real-time when it matches criteria
+            this.emitTweet(tweet);
+            
             return tweet;
           }
           return null;
