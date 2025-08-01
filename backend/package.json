@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node -r tsconfig-paths/register dist/index.js",
     "dev": "ts-node-dev -r tsconfig-paths/register src/index.ts",
-    "build": "tsc",
+    "build": "tsc && cp src/users.json dist/",
     "clean": "rm -rf dist"
   },
   "repository": {

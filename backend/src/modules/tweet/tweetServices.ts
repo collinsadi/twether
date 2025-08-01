@@ -129,10 +129,37 @@ export class TweetMonitoringService {
     }
 
     try {
-      const usersPath = path.join(__dirname, "../../users.json");
-      const usersData = fs.readFileSync(usersPath, "utf8");
+      // Try multiple possible paths for different environments
+      const possiblePaths = [
+        path.join(__dirname, "../../users.json"), // Development: src/modules/tweet -> src/
+        path.join(__dirname, "../users.json"),    // Production: dist/modules/tweet -> dist/
+        path.join(process.cwd(), "src/users.json"), // Fallback: project root -> src/
+        path.join(process.cwd(), "dist/users.json"), // Fallback: project root -> dist/
+      ];
+
+      let usersData: string | null = null;
+      let usedPath: string | null = null;
+
+      for (const filePath of possiblePaths) {
+        try {
+          if (fs.existsSync(filePath)) {
+            usersData = fs.readFileSync(filePath, "utf8");
+            usedPath = filePath;
+            console.log(`✅ Found users.json at: ${filePath}`);
+            break;
+          }
+        } catch (err) {
+          // Continue to next path
+        }
+      }
+
+      if (!usersData) {
+        throw new Error(`Could not find users.json in any of the expected locations: ${possiblePaths.join(", ")}`);
+      }
+
       const parsedUsers = JSON.parse(usersData);
       this.usersCache = Array.isArray(parsedUsers) ? parsedUsers : [];
+      console.log(`📋 Loaded ${this.usersCache.length} users from ${usedPath}`);
       return this.usersCache;
     } catch (error) {
       console.error("Error reading users.json:", error);
