@@ -14,9 +14,24 @@ class TweetController {
   }
 
   async getTweets(req: Request, res: Response) {
-    const tweets = await tweetMonitoringService.getTweetsForUsers();
-    res.json(tweets);
+    try {
+      const tweets = await tweetMonitoringService.getTweetsForUsers();
+      res.json({
+        success: true,
+        message: `Successfully fetched ${tweets.length} new tweets`,
+        data: tweets
+      });
+    } catch (error) {
+      console.error('Error in getTweets:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error fetching tweets',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
   }
+
+
 }
 
 export default TweetController.getInstance();

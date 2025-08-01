@@ -1,7 +1,8 @@
 import { twitterApi } from "../../common/config/twitterApi";
 import * as fs from "fs";
 import * as path from "path";
-import { Tweet } from "../../schemas/TweetSchema";  
+import { Tweet } from "../../schemas/TweetSchema";
+import { LastChecked } from "../../schemas/LastCheckedSchema";  
 
 interface Tweet {
   id: string;
@@ -109,6 +110,62 @@ export class TweetMonitoringService {
   }
 
   /**
+   * Get or create last checked time for a user
+   */
+  private async getLastCheckedTime(username: string): Promise<Date> {
+    try {
+      let lastChecked = await LastChecked.findOne({ username });
+      
+      if (!lastChecked) {
+        // If no record exists, create one with a default time (24 hours ago)
+        const defaultTime = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        lastChecked = await LastChecked.create({
+          username,
+          lastCheckedAt: defaultTime
+        });
+        console.log(`Created new last checked record for ${username} with default time: ${defaultTime}`);
+      }
+      
+      return lastChecked.lastCheckedAt;
+    } catch (error) {
+      console.error(`Error getting last checked time for ${username}:`, error);
+      // Fallback to 24 hours ago if there's an error
+      return new Date(Date.now() - 24 * 60 * 60 * 1000);
+    }
+  }
+
+  /**
+   * Update last checked time for a user
+   */
+  private async updateLastCheckedTime(username: string): Promise<void> {
+    try {
+      await LastChecked.findOneAndUpdate(
+        { username },
+        { lastCheckedAt: new Date() },
+        { upsert: true, new: true }
+      );
+      console.log(`Updated last checked time for ${username} to ${new Date()}`);
+    } catch (error) {
+      console.error(`Error updating last checked time for ${username}:`, error);
+    }
+  }
+
+  /**
+   * Format date for Twitter API since parameter
+   * Twitter API expects format: YYYY-MM-DD_HH:MM:SS_UTC
+   */
+  private formatDateForTwitterAPI(date: Date): string {
+    const year = date.getUTCFullYear();
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(date.getUTCDate()).padStart(2, '0');
+    const hours = String(date.getUTCHours()).padStart(2, '0');
+    const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+    const seconds = String(date.getUTCSeconds()).padStart(2, '0');
+    
+    return `${year}-${month}-${day}_${hours}:${minutes}:${seconds}_UTC`;
+  }
+
+  /**
    * Extract simplified tweet data with only required fields
    */
   private extractSimplifiedTweetData(tweet: Tweet): SimplifiedTweet & { twitterId?: string } {
@@ -132,17 +189,25 @@ export class TweetMonitoringService {
 
   /**
    * Get tweets for users from users.json file with simplified data
+   * Only fetches tweets newer than the last checked time for each user
    */
   public async getTweetsForUsers(): Promise<SimplifiedTweet[]> {
     const users = this.readUsersFromFile();
-    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
-
     const allTweets: SimplifiedTweet[] = [];
 
     await Promise.all(
       users.map(async (user) => {
         try {
-          const query = `from:${user} since:${twoHoursAgo.toISOString()}`;
+          // Get the last checked time for this user
+          const lastCheckedTime = await this.getLastCheckedTime(user);
+          
+          // Format the date for Twitter API
+          // Try different formats based on Twitter API documentation
+          const sinceDate = this.formatDateForTwitterAPI(lastCheckedTime);
+          
+          const query = `from:${user} since:${sinceDate}`;
+          console.log(`Querying tweets for ${user} since ${sinceDate} (last checked: ${lastCheckedTime})`);
+          
           const response = await twitterApi.get(`/advanced_search`, {
             params: {
               query,
@@ -150,29 +215,45 @@ export class TweetMonitoringService {
             },
           });
 
-          console.log(`Tweets for ${user}:`, response.data);
-
           const tweets = response.data.tweets || [];
-          const simplifiedTweets = tweets.map((tweet: Tweet) =>
-            this.extractSimplifiedTweetData(tweet)
-          );
+          console.log(`Found ${tweets.length} new tweets for ${user}`);
 
-          allTweets.push(...simplifiedTweets);
-
-          // Insert tweets with error handling for duplicates
-          try {
-            await Tweet.insertMany(simplifiedTweets, { 
-              ordered: false, // Continue inserting even if some fail
-              rawResult: false 
+          // Debug: Log the first few tweets to see their creation dates
+          if (tweets.length > 0) {
+            console.log(`First tweet for ${user}:`, {
+              id: tweets[0].id,
+              createdAt: tweets[0].createdAt || tweets[0].created_at,
+              text: tweets[0].text?.substring(0, 100) + '...'
             });
-          } catch (error: any) {
-            if (error.code === 11000) {
-              // Handle duplicate key errors
-              console.log(`Some tweets were already in the database for ${user}`);
-            } else {
-              console.error(`Error inserting tweets for ${user}:`, error);
+          }
+
+          if (tweets.length > 0) {
+            const simplifiedTweets = tweets.map((tweet: Tweet) =>
+              this.extractSimplifiedTweetData(tweet)
+            );
+
+            allTweets.push(...simplifiedTweets);
+
+            // Insert tweets with error handling for duplicates
+            try {
+              await Tweet.insertMany(simplifiedTweets, { 
+                ordered: false, // Continue inserting even if some fail
+                rawResult: false 
+              });
+              console.log(`Successfully inserted ${simplifiedTweets.length} tweets for ${user}`);
+            } catch (error: any) {
+              if (error.code === 11000) {
+                // Handle duplicate key errors
+                console.log(`Some tweets were already in the database for ${user}`);
+              } else {
+                console.error(`Error inserting tweets for ${user}:`, error);
+              }
             }
           }
+
+          // Update the last checked time for this user
+          await this.updateLastCheckedTime(user);
+          
         } catch (error) {
           console.error(`Error fetching tweets for ${user}:`, error);
         }
@@ -180,6 +261,97 @@ export class TweetMonitoringService {
     );
 
     return allTweets;
+  }
+
+  /**
+   * Get last checked times for all monitored users
+   */
+  public async getLastCheckedTimes(): Promise<{ username: string; lastCheckedAt: Date }[]> {
+    try {
+      const lastCheckedRecords = await LastChecked.find({}).sort({ lastCheckedAt: -1 });
+      return lastCheckedRecords.map(record => ({
+        username: record.username,
+        lastCheckedAt: record.lastCheckedAt
+      }));
+    } catch (error) {
+      console.error('Error getting last checked times:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Reset last checked time for a specific user (useful for testing or manual resets)
+   */
+  public async resetLastCheckedTime(username: string, resetTo?: Date): Promise<void> {
+    try {
+      const resetDate = resetTo || new Date(Date.now() - 24 * 60 * 60 * 1000); // Default to 24 hours ago
+      await LastChecked.findOneAndUpdate(
+        { username },
+        { lastCheckedAt: resetDate },
+        { upsert: true, new: true }
+      );
+      console.log(`Reset last checked time for ${username} to ${resetDate}`);
+    } catch (error) {
+      console.error(`Error resetting last checked time for ${username}:`, error);
+    }
+  }
+
+  /**
+   * Test API query with different date formats to debug the since parameter
+   */
+  public async testApiQuery(username: string): Promise<any> {
+    try {
+      const lastCheckedTime = await this.getLastCheckedTime(username);
+      
+      // Test different date formats
+      const formats = [
+        this.formatDateForTwitterAPI(lastCheckedTime), // YYYY-MM-DD_HH:MM:SS_UTC
+        lastCheckedTime.toISOString().split('T')[0], // YYYY-MM-DD
+        lastCheckedTime.toISOString().replace('T', '_').replace('Z', '_UTC'), 
+      ];
+
+      const results = [];
+
+      for (const format of formats) {
+        const query = `from:${username} since:${format}`;
+        console.log(`Testing query: ${query}`);
+        
+        try {
+          const response = await twitterApi.get(`/advanced_search`, {
+            params: {
+              query,
+              queryType: "Latest",
+            },
+          });
+          
+          results.push({
+            format,
+            query,
+            tweetCount: response.data.tweets?.length || 0,
+            firstTweet: response.data.tweets?.[0] ? {
+              id: response.data.tweets[0].id,
+              createdAt: response.data.tweets[0].createdAt || response.data.tweets[0].created_at,
+              text: response.data.tweets[0].text?.substring(0, 50) + '...'
+            } : null
+          });
+        } catch (error) {
+          results.push({
+            format,
+            query,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          });
+        }
+      }
+
+      return {
+        username,
+        lastCheckedTime,
+        results
+      };
+    } catch (error) {
+      console.error(`Error testing API query for ${username}:`, error);
+      return { error: error instanceof Error ? error.message : 'Unknown error' };
+    }
   }
 }
 
