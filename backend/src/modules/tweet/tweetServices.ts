@@ -2,7 +2,8 @@ import { twitterApi } from "../../common/config/twitterApi";
 import * as fs from "fs";
 import * as path from "path";
 import { Tweet } from "../../schemas/TweetSchema";
-import { LastChecked } from "../../schemas/LastCheckedSchema";  
+import { LastChecked } from "../../schemas/LastCheckedSchema";
+import { analyzeTweet } from "../llm/gemini";
 
 interface Tweet {
   id: string;
@@ -16,7 +17,7 @@ interface Tweet {
     userName: string;
     verified: boolean;
     isBlueVerified: boolean;
-    isVerified: boolean;  
+    isVerified: boolean;
     verifiedType: string;
     followersCount: number;
     followingCount: number;
@@ -75,11 +76,12 @@ interface SimplifiedTweet {
   authorName: string;
   username: string;
   isVerified: boolean;
-  verifiedType: string; 
+  verifiedType: string;
   profilePicture: string;
   tweetUrl: string;
   mediaPreviewUrl?: string;
   mediaType?: string;
+  topics: string[];
   createdAt: string;
 }
 
@@ -115,17 +117,19 @@ export class TweetMonitoringService {
   private async getLastCheckedTime(username: string): Promise<Date> {
     try {
       let lastChecked = await LastChecked.findOne({ username });
-      
+
       if (!lastChecked) {
         // If no record exists, create one with a default time (24 hours ago)
         const defaultTime = new Date(Date.now() - 24 * 60 * 60 * 1000);
         lastChecked = await LastChecked.create({
           username,
-          lastCheckedAt: defaultTime
+          lastCheckedAt: defaultTime,
         });
-        console.log(`Created new last checked record for ${username} with default time: ${defaultTime}`);
+        console.log(
+          `Created new last checked record for ${username} with default time: ${defaultTime}`
+        );
       }
-      
+
       return lastChecked.lastCheckedAt;
     } catch (error) {
       console.error(`Error getting last checked time for ${username}:`, error);
@@ -156,19 +160,21 @@ export class TweetMonitoringService {
    */
   private formatDateForTwitterAPI(date: Date): string {
     const year = date.getUTCFullYear();
-    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-    const day = String(date.getUTCDate()).padStart(2, '0');
-    const hours = String(date.getUTCHours()).padStart(2, '0');
-    const minutes = String(date.getUTCMinutes()).padStart(2, '0');
-    const seconds = String(date.getUTCSeconds()).padStart(2, '0');
-    
+    const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(date.getUTCDate()).padStart(2, "0");
+    const hours = String(date.getUTCHours()).padStart(2, "0");
+    const minutes = String(date.getUTCMinutes()).padStart(2, "0");
+    const seconds = String(date.getUTCSeconds()).padStart(2, "0");
+
     return `${year}-${month}-${day}_${hours}:${minutes}:${seconds}_UTC`;
   }
 
   /**
    * Extract simplified tweet data with only required fields
    */
-  private extractSimplifiedTweetData(tweet: Tweet): SimplifiedTweet & { twitterId?: string } {
+  private extractSimplifiedTweetData(
+    tweet: Tweet
+  ): SimplifiedTweet & { twitterId?: string } {
     const author = tweet.author;
     const media = tweet.extendedEntities?.media?.[0];
 
@@ -183,6 +189,7 @@ export class TweetMonitoringService {
       tweetUrl: tweet.twitterUrl || tweet.url || "",
       mediaPreviewUrl: media?.media_url_https,
       mediaType: media?.type,
+      topics: [], // Will be populated after AI analysis
       createdAt: tweet.createdAt || "",
     };
   }
@@ -200,14 +207,16 @@ export class TweetMonitoringService {
         try {
           // Get the last checked time for this user
           const lastCheckedTime = await this.getLastCheckedTime(user);
-          
+
           // Format the date for Twitter API
           // Try different formats based on Twitter API documentation
           const sinceDate = this.formatDateForTwitterAPI(lastCheckedTime);
-          
+
           const query = `from:${user} since:${sinceDate}`;
-          console.log(`Querying tweets for ${user} since ${sinceDate} (last checked: ${lastCheckedTime})`);
-          
+          console.log(
+            `Querying tweets for ${user} since ${sinceDate} (last checked: ${lastCheckedTime})`
+          );
+
           const response = await twitterApi.get(`/advanced_search`, {
             params: {
               query,
@@ -223,7 +232,7 @@ export class TweetMonitoringService {
             console.log(`First tweet for ${user}:`, {
               id: tweets[0].id,
               createdAt: tweets[0].createdAt || tweets[0].created_at,
-              text: tweets[0].text?.substring(0, 100) + '...'
+              text: tweets[0].text?.substring(0, 100) + "...",
             });
           }
 
@@ -232,28 +241,78 @@ export class TweetMonitoringService {
               this.extractSimplifiedTweetData(tweet)
             );
 
-            allTweets.push(...simplifiedTweets);
+            // AI analysis and filtering of tweets
+            const filteredTweets = [];
 
-            // Insert tweets with error handling for duplicates
-            try {
-              await Tweet.insertMany(simplifiedTweets, { 
-                ordered: false, // Continue inserting even if some fail
-                rawResult: false 
-              });
-              console.log(`Successfully inserted ${simplifiedTweets.length} tweets for ${user}`);
-            } catch (error: any) {
-              if (error.code === 11000) {
-                // Handle duplicate key errors
-                console.log(`Some tweets were already in the database for ${user}`);
-              } else {
-                console.error(`Error inserting tweets for ${user}:`, error);
+            for (const tweet of simplifiedTweets) {
+              try {
+                // Analyze the tweet using Gemini
+                const analysisResult = await analyzeTweet(tweet.tweetText);
+                const analysis = JSON.parse(analysisResult);
+
+                // Check if tweet meets criteria: impact not "low", topics not empty, and sentiment is positive
+                if (
+                  analysis.impact !== "low" &&
+                  analysis.topics &&
+                  analysis.topics.length > 0 &&
+                  (analysis.sentiment === "positive" ||
+                    analysis.sentiment === "neutral")
+                ) {
+                  // Update the tweet with the analyzed topics
+                  tweet.topics = analysis.topics;
+                  filteredTweets.push(tweet);
+                  console.log(
+                    `Tweet approved for ${user}: ${tweet.tweetText.substring(
+                      0,
+                      50
+                    )}...`
+                  );
+                } else {
+                  console.log(
+                    `Tweet filtered out for ${user}: impact=${
+                      analysis.impact
+                    }, topics=${analysis.topics?.length || 0}, sentiment=${
+                      analysis.sentiment
+                    }`
+                  );
+                }
+              } catch (error) {
+                console.error(`Error analyzing tweet for ${user}:`, error);
+                // If analysis fails, skip the tweet
+                continue;
               }
+            }
+
+            // Add filtered tweets to allTweets
+            allTweets.push(...filteredTweets);
+
+            // Insert only filtered tweets with error handling for duplicates
+            if (filteredTweets.length > 0) {
+              try {
+                await Tweet.insertMany(filteredTweets, {
+                  ordered: false, // Continue inserting even if some fail
+                  rawResult: false,
+                });
+                console.log(
+                  `Successfully inserted ${filteredTweets.length} filtered tweets for ${user}`
+                );
+              } catch (error: any) {
+                if (error.code === 11000) {
+                  // Handle duplicate key errors
+                  console.log(
+                    `Some tweets were already in the database for ${user}`
+                  );
+                } else {
+                  console.error(`Error inserting tweets for ${user}:`, error);
+                }
+              }
+            } else {
+              console.log(`No tweets met the criteria for ${user}`);
             }
           }
 
           // Update the last checked time for this user
           await this.updateLastCheckedTime(user);
-          
         } catch (error) {
           console.error(`Error fetching tweets for ${user}:`, error);
         }
@@ -266,15 +325,19 @@ export class TweetMonitoringService {
   /**
    * Get last checked times for all monitored users
    */
-  public async getLastCheckedTimes(): Promise<{ username: string; lastCheckedAt: Date }[]> {
+  public async getLastCheckedTimes(): Promise<
+    { username: string; lastCheckedAt: Date }[]
+  > {
     try {
-      const lastCheckedRecords = await LastChecked.find({}).sort({ lastCheckedAt: -1 });
-      return lastCheckedRecords.map(record => ({
+      const lastCheckedRecords = await LastChecked.find({}).sort({
+        lastCheckedAt: -1,
+      });
+      return lastCheckedRecords.map((record) => ({
         username: record.username,
-        lastCheckedAt: record.lastCheckedAt
+        lastCheckedAt: record.lastCheckedAt,
       }));
     } catch (error) {
-      console.error('Error getting last checked times:', error);
+      console.error("Error getting last checked times:", error);
       return [];
     }
   }
@@ -282,7 +345,10 @@ export class TweetMonitoringService {
   /**
    * Reset last checked time for a specific user (useful for testing or manual resets)
    */
-  public async resetLastCheckedTime(username: string, resetTo?: Date): Promise<void> {
+  public async resetLastCheckedTime(
+    username: string,
+    resetTo?: Date
+  ): Promise<void> {
     try {
       const resetDate = resetTo || new Date(Date.now() - 24 * 60 * 60 * 1000); // Default to 24 hours ago
       await LastChecked.findOneAndUpdate(
@@ -292,7 +358,10 @@ export class TweetMonitoringService {
       );
       console.log(`Reset last checked time for ${username} to ${resetDate}`);
     } catch (error) {
-      console.error(`Error resetting last checked time for ${username}:`, error);
+      console.error(
+        `Error resetting last checked time for ${username}:`,
+        error
+      );
     }
   }
 
@@ -302,12 +371,12 @@ export class TweetMonitoringService {
   public async testApiQuery(username: string): Promise<any> {
     try {
       const lastCheckedTime = await this.getLastCheckedTime(username);
-      
+
       // Test different date formats
       const formats = [
         this.formatDateForTwitterAPI(lastCheckedTime), // YYYY-MM-DD_HH:MM:SS_UTC
-        lastCheckedTime.toISOString().split('T')[0], // YYYY-MM-DD
-        lastCheckedTime.toISOString().replace('T', '_').replace('Z', '_UTC'), 
+        lastCheckedTime.toISOString().split("T")[0], // YYYY-MM-DD
+        lastCheckedTime.toISOString().replace("T", "_").replace("Z", "_UTC"),
       ];
 
       const results = [];
@@ -315,7 +384,7 @@ export class TweetMonitoringService {
       for (const format of formats) {
         const query = `from:${username} since:${format}`;
         console.log(`Testing query: ${query}`);
-        
+
         try {
           const response = await twitterApi.get(`/advanced_search`, {
             params: {
@@ -323,22 +392,26 @@ export class TweetMonitoringService {
               queryType: "Latest",
             },
           });
-          
+
           results.push({
             format,
             query,
             tweetCount: response.data.tweets?.length || 0,
-            firstTweet: response.data.tweets?.[0] ? {
-              id: response.data.tweets[0].id,
-              createdAt: response.data.tweets[0].createdAt || response.data.tweets[0].created_at,
-              text: response.data.tweets[0].text?.substring(0, 50) + '...'
-            } : null
+            firstTweet: response.data.tweets?.[0]
+              ? {
+                  id: response.data.tweets[0].id,
+                  createdAt:
+                    response.data.tweets[0].createdAt ||
+                    response.data.tweets[0].created_at,
+                  text: response.data.tweets[0].text?.substring(0, 50) + "...",
+                }
+              : null,
           });
         } catch (error) {
           results.push({
             format,
             query,
-            error: error instanceof Error ? error.message : 'Unknown error'
+            error: error instanceof Error ? error.message : "Unknown error",
           });
         }
       }
@@ -346,11 +419,13 @@ export class TweetMonitoringService {
       return {
         username,
         lastCheckedTime,
-        results
+        results,
       };
     } catch (error) {
       console.error(`Error testing API query for ${username}:`, error);
-      return { error: error instanceof Error ? error.message : 'Unknown error' };
+      return {
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
     }
   }
 }

@@ -11,6 +11,7 @@ export interface ITweet extends Document {
   tweetUrl: string;
   mediaPreviewUrl?: string;
   mediaType?: string;
+  topics: string[];
   createdAt: string;
   createdAtDate: Date;
   updatedAt: Date;
@@ -69,6 +70,11 @@ const TweetSchema: Schema = new Schema({
     type: String,
     trim: true,
     enum: ['photo', 'video', 'animated_gif', '']
+  },
+  topics: {
+    type: [String],
+    default: [],
+    trim: true
   },
   createdAt: {
     type: String,
