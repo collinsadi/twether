@@ -1,5 +1,4 @@
 import { twitterApi } from "../../common/config/twitterApi";
-import { Tweet } from "../../schemas";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -80,18 +79,6 @@ interface SimplifiedTweet {
   mediaPreviewUrl?: string;
   mediaType?: string;
   createdAt: string;
-}
-
-interface TwitterApiResponse {
-  tweets: Tweet[];
-  has_next_page: boolean;
-  next_cursor: string;
-}
-
-interface TweetSearchParams {
-  query: string;
-  queryType: string;
-  cursor?: string;
 }
 
 export class TweetMonitoringService {
