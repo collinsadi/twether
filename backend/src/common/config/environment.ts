@@ -10,5 +10,8 @@ export const ENVIRONMENT = {
   },
   DB: {
     URL: process.env.DB_URL,
+  },
+  TWITTER: {
+    API_KEY: process.env.TWITTER_API_KEY,
   }
 };
