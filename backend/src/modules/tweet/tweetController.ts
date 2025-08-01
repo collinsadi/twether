@@ -1,5 +1,4 @@
 import { Request, Response } from "express";
-import { TweetMonitoringService } from "./tweetServices";
 import { Tweet } from "../../schemas/TweetSchema";
 
 class TweetController {
