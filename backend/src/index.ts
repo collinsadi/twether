@@ -32,20 +32,26 @@ const tweetService = TweetMonitoringService.getInstance();
 // Set Socket.IO instance for real-time emissions
 tweetService.setSocketIO(io);
 
-// Setup cron job to fetch tweets every 10 minutes
-cron.schedule('*/10 * * * *', async () => {
-  console.log('🔄 Running scheduled tweet fetch...');
-  try {
-    const tweets = await tweetService.getTweetsForUsers();
-    console.log(`✅ Scheduled fetch completed. Found ${tweets.length} tweets.`);
-  } catch (error) {
-    console.error('❌ Error in scheduled tweet fetch:', error);
-  }
-}, {
-  timezone: "UTC"
-});
+// Setup cron job to fetch tweets every 10 minutes (only if RUN_CRON is true)
+const shouldRunCron = process.env.RUN_CRON === 'true';
 
-console.log('⏰ Cron job scheduled: Tweet fetching every 10 minutes');
+if (shouldRunCron) {
+  cron.schedule('*/10 * * * *', async () => {
+    console.log('🔄 Running scheduled tweet fetch...');
+    try {
+      const tweets = await tweetService.getTweetsForUsers();
+      console.log(`✅ Scheduled fetch completed. Found ${tweets.length} tweets.`);
+    } catch (error) {
+      console.error('❌ Error in scheduled tweet fetch:', error);
+    }
+  }, {
+    timezone: "UTC"
+  });
+
+  console.log('⏰ Cron job scheduled: Tweet fetching every 10 minutes');
+} else {
+  console.log('⏰ Cron job disabled: RUN_CRON environment variable is not set to "true"');
+}
 
 // API Routes
 app.get("/api/health", (req: Request, res: Response) => {
