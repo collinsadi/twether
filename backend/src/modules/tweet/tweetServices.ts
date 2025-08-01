@@ -1,6 +1,7 @@
 import { twitterApi } from "../../common/config/twitterApi";
 import * as fs from "fs";
 import * as path from "path";
+import { Tweet } from "../../schemas/TweetSchema";  
 
 interface Tweet {
   id: string;
@@ -110,11 +111,12 @@ export class TweetMonitoringService {
   /**
    * Extract simplified tweet data with only required fields
    */
-  private extractSimplifiedTweetData(tweet: Tweet): SimplifiedTweet {
+  private extractSimplifiedTweetData(tweet: Tweet): SimplifiedTweet & { twitterId?: string } {
     const author = tweet.author;
     const media = tweet.extendedEntities?.media?.[0];
 
     return {
+      twitterId: tweet.id,
       tweetText: tweet.text,
       authorName: author?.name || "",
       username: author?.userName || "",
@@ -156,6 +158,21 @@ export class TweetMonitoringService {
           );
 
           allTweets.push(...simplifiedTweets);
+
+          // Insert tweets with error handling for duplicates
+          try {
+            await Tweet.insertMany(simplifiedTweets, { 
+              ordered: false, // Continue inserting even if some fail
+              rawResult: false 
+            });
+          } catch (error: any) {
+            if (error.code === 11000) {
+              // Handle duplicate key errors
+              console.log(`Some tweets were already in the database for ${user}`);
+            } else {
+              console.error(`Error inserting tweets for ${user}:`, error);
+            }
+          }
         } catch (error) {
           console.error(`Error fetching tweets for ${user}:`, error);
         }

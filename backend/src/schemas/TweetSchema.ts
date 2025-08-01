@@ -1,6 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 export interface ITweet extends Document {
+  twitterId?: string;
   tweetText: string;
   authorName: string;
   username: string;
@@ -16,6 +17,11 @@ export interface ITweet extends Document {
 }
 
 const TweetSchema: Schema = new Schema({
+  twitterId: {
+    type: String,
+    trim: true,
+    sparse: true // Allows multiple null values
+  },
   tweetText: {
     type: String,
     required: true,
@@ -62,7 +68,7 @@ const TweetSchema: Schema = new Schema({
   mediaType: {
     type: String,
     trim: true,
-    enum: ['photo', 'video', 'animated_gif', ''] // Common Twitter media types
+    enum: ['photo', 'video', 'animated_gif', '']
   },
   createdAt: {
     type: String,
@@ -82,6 +88,7 @@ TweetSchema.index({ username: 1 });
 TweetSchema.index({ createdAtDate: -1 });
 TweetSchema.index({ isVerified: 1 });
 TweetSchema.index({ tweetUrl: 1 }, { unique: true });
+TweetSchema.index({ twitterId: 1 }, { unique: true, sparse: true });
 
 // Text index for search functionality
 TweetSchema.index({ 
