@@ -87,6 +87,10 @@ interface SimplifiedTweet {
 
 export class TweetMonitoringService {
   private static instance: TweetMonitoringService;
+  private usersCache: string[] | null = null;
+  private lastCheckedCache: Map<string, Date> = new Map();
+  private rateLimitDelay = 1000; // 1 second delay between API calls
+  private batchSize = 10; // Process tweets in batches for AI analysis
 
   private constructor() {}
 
@@ -98,13 +102,19 @@ export class TweetMonitoringService {
   }
 
   /**
-   * Read users from users.json file
+   * Read users from users.json file with caching
    */
   private readUsersFromFile(): string[] {
+    if (this.usersCache) {
+      return this.usersCache;
+    }
+
     try {
       const usersPath = path.join(__dirname, "../../users.json");
       const usersData = fs.readFileSync(usersPath, "utf8");
-      return JSON.parse(usersData);
+      const parsedUsers = JSON.parse(usersData);
+      this.usersCache = Array.isArray(parsedUsers) ? parsedUsers : [];
+      return this.usersCache;
     } catch (error) {
       console.error("Error reading users.json:", error);
       return [];
@@ -112,9 +122,21 @@ export class TweetMonitoringService {
   }
 
   /**
-   * Get or create last checked time for a user
+   * Clear users cache (useful for testing or when users.json changes)
+   */
+  public clearUsersCache(): void {
+    this.usersCache = null;
+  }
+
+  /**
+   * Get or create last checked time for a user with caching
    */
   private async getLastCheckedTime(username: string): Promise<Date> {
+    // Check cache first
+    if (this.lastCheckedCache.has(username)) {
+      return this.lastCheckedCache.get(username)!;
+    }
+
     try {
       let lastChecked = await LastChecked.findOne({ username });
 
@@ -130,28 +152,42 @@ export class TweetMonitoringService {
         );
       }
 
+      // Cache the result
+      this.lastCheckedCache.set(username, lastChecked.lastCheckedAt);
       return lastChecked.lastCheckedAt;
     } catch (error) {
       console.error(`Error getting last checked time for ${username}:`, error);
       // Fallback to 24 hours ago if there's an error
-      return new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const fallbackTime = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      this.lastCheckedCache.set(username, fallbackTime);
+      return fallbackTime;
     }
   }
 
   /**
-   * Update last checked time for a user
+   * Update last checked time for a user and cache
    */
   private async updateLastCheckedTime(username: string): Promise<void> {
     try {
+      const newTime = new Date();
       await LastChecked.findOneAndUpdate(
         { username },
-        { lastCheckedAt: new Date() },
+        { lastCheckedAt: newTime },
         { upsert: true, new: true }
       );
-      console.log(`Updated last checked time for ${username} to ${new Date()}`);
+      // Update cache
+      this.lastCheckedCache.set(username, newTime);
+      console.log(`Updated last checked time for ${username} to ${newTime}`);
     } catch (error) {
       console.error(`Error updating last checked time for ${username}:`, error);
     }
+  }
+
+  /**
+   * Rate limiting utility
+   */
+  private async delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   /**
@@ -195,130 +231,177 @@ export class TweetMonitoringService {
   }
 
   /**
-   * Get tweets for users from users.json file with simplified data
+   * Batch analyze tweets using AI for better performance
+   */
+  private async batchAnalyzeTweets(tweets: SimplifiedTweet[]): Promise<SimplifiedTweet[]> {
+    const filteredTweets: SimplifiedTweet[] = [];
+    
+    // Process tweets in batches
+    for (let i = 0; i < tweets.length; i += this.batchSize) {
+      const batch = tweets.slice(i, i + this.batchSize);
+      
+      // Analyze batch in parallel
+      const analysisPromises = batch.map(async (tweet) => {
+        try {
+          const analysisResult = await analyzeTweet(tweet.tweetText);
+          const analysis = JSON.parse(analysisResult);
+
+          // Check if tweet meets criteria
+          if (
+            analysis.impact !== "low" &&
+            analysis.topics &&
+            analysis.topics.length > 0 &&
+            (analysis.sentiment === "positive" || analysis.sentiment === "neutral")
+          ) {
+            tweet.topics = analysis.topics;
+            return tweet;
+          }
+          return null;
+        } catch (error) {
+          console.error(`Error analyzing tweet:`, error);
+          return null;
+        }
+      });
+
+      // Wait for batch analysis to complete
+      const results = await Promise.all(analysisPromises);
+      const validTweets = results.filter(tweet => tweet !== null) as SimplifiedTweet[];
+      filteredTweets.push(...validTweets);
+
+      // Add delay between batches to avoid rate limiting
+      if (i + this.batchSize < tweets.length) {
+        await this.delay(500);
+      }
+    }
+
+    return filteredTweets;
+  }
+
+  /**
+   * Batch insert tweets with error handling
+   */
+  private async batchInsertTweets(tweets: SimplifiedTweet[]): Promise<void> {
+    if (tweets.length === 0) return;
+
+    try {
+      // Use bulkWrite for better performance
+      const operations = tweets.map(tweet => ({
+        insertOne: {
+          document: tweet
+        }
+      }));
+
+      await Tweet.bulkWrite(operations, {
+        ordered: false, 
+        writeConcern: { w: 1 }
+      });
+
+      console.log(`Successfully inserted ${tweets.length} tweets in batch`);
+    } catch (error: any) {
+      if (error.code === 11000) {
+        console.log(`Some tweets were already in the database (duplicate key error)`);
+      } else {
+        console.error(`Error batch inserting tweets:`, error);
+      }
+    }
+  }
+
+  /**
+   * Fetch tweets for a single user with rate limiting
+   */
+  private async fetchTweetsForUser(user: string): Promise<SimplifiedTweet[]> {
+    try {
+      // Get the last checked time for this user
+      const lastCheckedTime = await this.getLastCheckedTime(user);
+      const sinceDate = this.formatDateForTwitterAPI(lastCheckedTime);
+
+      const query = `from:${user} since:${sinceDate}`;
+      console.log(
+        `Querying tweets for ${user} since ${sinceDate} (last checked: ${lastCheckedTime})`
+      );
+
+      const response = await twitterApi.get(`/advanced_search`, {
+        params: {
+          query,
+          queryType: "Latest",
+        },
+      });
+
+      const tweets = response.data.tweets || [];
+      console.log(`Found ${tweets.length} new tweets for ${user}`);
+
+      if (tweets.length === 0) {
+        // Update last checked time even if no tweets found
+        await this.updateLastCheckedTime(user);
+        return [];
+      }
+
+      // Debug: Log the first tweet
+      if (tweets.length > 0) {
+        console.log(`First tweet for ${user}:`, {
+          id: tweets[0].id,
+          createdAt: tweets[0].createdAt || tweets[0].created_at,
+          text: tweets[0].text?.substring(0, 100) + "...",
+        });
+      }
+
+      // Extract simplified tweet data
+      const simplifiedTweets = tweets.map((tweet: Tweet) =>
+        this.extractSimplifiedTweetData(tweet)
+      );
+
+      // Batch analyze tweets
+      const filteredTweets = await this.batchAnalyzeTweets(simplifiedTweets);
+
+      // Update the last checked time for this user
+      await this.updateLastCheckedTime(user);
+
+      return filteredTweets;
+    } catch (error) {
+      console.error(`Error fetching tweets for ${user}:`, error);
+      return [];
+    }
+  }
+
+  /**
+   * Get tweets for users from users.json file with optimized performance
    * Only fetches tweets newer than the last checked time for each user
    */
   public async getTweetsForUsers(): Promise<SimplifiedTweet[]> {
     const users = this.readUsersFromFile();
     const allTweets: SimplifiedTweet[] = [];
 
-    await Promise.all(
-      users.map(async (user) => {
-        try {
-          // Get the last checked time for this user
-          const lastCheckedTime = await this.getLastCheckedTime(user);
+    // Process users in parallel with rate limiting
+    const userBatches = [];
+    for (let i = 0; i < users.length; i += 3) { // Process 3 users at a time
+      userBatches.push(users.slice(i, i + 3));
+    }
 
-          // Format the date for Twitter API
-          // Try different formats based on Twitter API documentation
-          const sinceDate = this.formatDateForTwitterAPI(lastCheckedTime);
+    for (const batch of userBatches) {
+      // Process batch in parallel
+      const batchPromises = batch.map(async (user) => {
+        const tweets = await this.fetchTweetsForUser(user);
+        return tweets;
+      });
 
-          const query = `from:${user} since:${sinceDate}`;
-          console.log(
-            `Querying tweets for ${user} since ${sinceDate} (last checked: ${lastCheckedTime})`
-          );
+      const batchResults = await Promise.all(batchPromises);
+      
+      // Flatten results
+      const batchTweets = batchResults.flat();
+      allTweets.push(...batchTweets);
 
-          const response = await twitterApi.get(`/advanced_search`, {
-            params: {
-              query,
-              queryType: "Latest",
-            },
-          });
+      // Add delay between batches to avoid rate limiting
+      if (userBatches.indexOf(batch) < userBatches.length - 1) {
+        await this.delay(this.rateLimitDelay);
+      }
+    }
 
-          const tweets = response.data.tweets || [];
-          console.log(`Found ${tweets.length} new tweets for ${user}`);
+    // Batch insert all tweets at once
+    if (allTweets.length > 0) {
+      await this.batchInsertTweets(allTweets);
+    }
 
-          // Debug: Log the first few tweets to see their creation dates
-          if (tweets.length > 0) {
-            console.log(`First tweet for ${user}:`, {
-              id: tweets[0].id,
-              createdAt: tweets[0].createdAt || tweets[0].created_at,
-              text: tweets[0].text?.substring(0, 100) + "...",
-            });
-          }
-
-          if (tweets.length > 0) {
-            const simplifiedTweets = tweets.map((tweet: Tweet) =>
-              this.extractSimplifiedTweetData(tweet)
-            );
-
-            // AI analysis and filtering of tweets
-            const filteredTweets = [];
-
-            for (const tweet of simplifiedTweets) {
-              try {
-                // Analyze the tweet using Gemini
-                const analysisResult = await analyzeTweet(tweet.tweetText);
-                const analysis = JSON.parse(analysisResult);
-
-                // Check if tweet meets criteria: impact not "low", topics not empty, and sentiment is positive
-                if (
-                  analysis.impact !== "low" &&
-                  analysis.topics &&
-                  analysis.topics.length > 0 &&
-                  (analysis.sentiment === "positive" ||
-                    analysis.sentiment === "neutral")
-                ) {
-                  // Update the tweet with the analyzed topics
-                  tweet.topics = analysis.topics;
-                  filteredTweets.push(tweet);
-                  console.log(
-                    `Tweet approved for ${user}: ${tweet.tweetText.substring(
-                      0,
-                      50
-                    )}...`
-                  );
-                } else {
-                  console.log(
-                    `Tweet filtered out for ${user}: impact=${
-                      analysis.impact
-                    }, topics=${analysis.topics?.length || 0}, sentiment=${
-                      analysis.sentiment
-                    }`
-                  );
-                }
-              } catch (error) {
-                console.error(`Error analyzing tweet for ${user}:`, error);
-                // If analysis fails, skip the tweet
-                continue;
-              }
-            }
-
-            // Add filtered tweets to allTweets
-            allTweets.push(...filteredTweets);
-
-            // Insert only filtered tweets with error handling for duplicates
-            if (filteredTweets.length > 0) {
-              try {
-                await Tweet.insertMany(filteredTweets, {
-                  ordered: false, // Continue inserting even if some fail
-                  rawResult: false,
-                });
-                console.log(
-                  `Successfully inserted ${filteredTweets.length} filtered tweets for ${user}`
-                );
-              } catch (error: any) {
-                if (error.code === 11000) {
-                  // Handle duplicate key errors
-                  console.log(
-                    `Some tweets were already in the database for ${user}`
-                  );
-                } else {
-                  console.error(`Error inserting tweets for ${user}:`, error);
-                }
-              }
-            } else {
-              console.log(`No tweets met the criteria for ${user}`);
-            }
-          }
-
-          // Update the last checked time for this user
-          await this.updateLastCheckedTime(user);
-        } catch (error) {
-          console.error(`Error fetching tweets for ${user}:`, error);
-        }
-      })
-    );
-
+    console.log(`Total tweets processed: ${allTweets.length}`);
     return allTweets;
   }
 
