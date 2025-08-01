@@ -28,7 +28,7 @@ The Twether interface includes a "Wi-Fi" icon next to the logo, which indicates 
 ## Development
 
 Twether is an open-source project, and contributions are highly encouraged. Developers and community members can contribute in the following ways:
-- **Adding Profiles**: Expand the list of notable Ethereum Twitter profiles in the `backend/users.json` file.
+- **Adding Profiles**: Expand the list of notable Ethereum Twitter profiles in the `backend/src/users.json` file.
 - **Improving the UI**: Enhance the user interface for better usability and aesthetics.
 - **System Optimization**: Optimize the backend and frontend systems for improved performance and scalability.
 

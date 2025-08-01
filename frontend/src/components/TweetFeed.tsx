@@ -16,7 +16,6 @@ export const TweetFeed = ({ searchQuery, activeFilter }: TweetFeedProps) => {
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
-  const [page, setPage] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [newTweetNotification, setNewTweetNotification] = useState<string | null>(null);
   
@@ -60,7 +59,6 @@ export const TweetFeed = ({ searchQuery, activeFilter }: TweetFeedProps) => {
   // Reset pagination when filters or search change
   useEffect(() => {
     setTweets([]);
-    setPage(1);
     currentPageRef.current = 1;
     setHasMore(true);
     setInitialLoading(true);
@@ -110,11 +108,9 @@ export const TweetFeed = ({ searchQuery, activeFilter }: TweetFeedProps) => {
 
         if (isInitialLoad) {
           setTweets(filteredTweets);
-          setPage(2);
           currentPageRef.current = 2;
         } else {
           setTweets((prev) => [...prev, ...filteredTweets]);
-          setPage((prev) => prev + 1);
           currentPageRef.current = currentPage + 1;
         }
         
@@ -185,7 +181,6 @@ export const TweetFeed = ({ searchQuery, activeFilter }: TweetFeedProps) => {
               onClick={() => {
                 setError(null);
                 setTweets([]);
-                setPage(1);
                 currentPageRef.current = 1;
                 setHasMore(true);
                 setInitialLoading(true);
