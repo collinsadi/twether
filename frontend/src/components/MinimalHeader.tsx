@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Search, Filter, X } from 'lucide-react';
 import { FaFeatherAlt } from "react-icons/fa";
+import { apiService } from '../services/api';
 
 interface MinimalHeaderProps {
   onSearch: (query: string) => void;
@@ -9,19 +10,54 @@ interface MinimalHeaderProps {
   activeFilter: string;
 }
 
-const filters = [
-  { id: 'all', label: 'All' },
-  { id: 'defi', label: 'DeFi' },
-  { id: 'dao', label: 'DAOs' },
-  { id: 'eth2', label: 'ETH2.0' },
-  { id: 'layer2', label: 'Layer2' },
-  { id: 'hackathons', label: 'Hackathons' },
-  { id: 'jobs', label: 'Jobs' }
-];
+interface Filter {
+  id: string;
+  label: string;
+}
 
 export const MinimalHeader = ({ onSearch, onFilterChange, activeFilter }: MinimalHeaderProps) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState<Filter[]>([
+    { id: 'all', label: 'All' }
+  ]);
+  const [loadingTopics, setLoadingTopics] = useState(false);
+
+  // Fetch topics from API
+  useEffect(() => {
+    const fetchTopics = async () => {
+      setLoadingTopics(true);
+      try {
+        const response = await apiService.getTopics();
+        if (response.success && response.data.length > 0) {
+          const topicFilters = response.data.map(topic => ({
+            id: topic,
+            label: topic.charAt(0).toUpperCase() + topic.slice(1)
+          }));
+          setFilters([
+            { id: 'all', label: 'All' },
+            ...topicFilters.slice(0, 10) // Limit to first 10 topics
+          ]);
+        }
+      } catch (error) {
+        console.error('Error fetching topics:', error);
+        // Fallback to default filters if API fails
+        setFilters([
+          { id: 'all', label: 'All' },
+          { id: 'defi', label: 'DeFi' },
+          { id: 'dao', label: 'DAOs' },
+          { id: 'eth2', label: 'ETH2.0' },
+          { id: 'layer2', label: 'Layer2' },
+          { id: 'hackathons', label: 'Hackathons' },
+          { id: 'jobs', label: 'Jobs' }
+        ]);
+      } finally {
+        setLoadingTopics(false);
+      }
+    };
+
+    fetchTopics();
+  }, []);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,19 +126,23 @@ export const MinimalHeader = ({ onSearch, onFilterChange, activeFilter }: Minima
           className="overflow-hidden"
         >
           <div className="flex flex-wrap gap-2 pb-3 sm:pb-4">
-            {filters.map((filter) => (
-              <motion.button
-                key={filter.id}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => onFilterChange(filter.id)}
-                className={`filter-button text-xs sm:text-sm px-3 sm:px-4 py-2 ${
-                  activeFilter === filter.id ? 'filter-button-active' : ''
-                }`}
-              >
-                {filter.label}
-              </motion.button>
-            ))}
+            {loadingTopics ? (
+              <div className="text-gray-500 text-sm">Loading topics...</div>
+            ) : (
+              filters.map((filter) => (
+                <motion.button
+                  key={filter.id}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => onFilterChange(filter.id)}
+                  className={`filter-button text-xs sm:text-sm px-3 sm:px-4 py-2 ${
+                    activeFilter === filter.id ? 'filter-button-active' : ''
+                  }`}
+                >
+                  {filter.label}
+                </motion.button>
+              ))
+            )}
           </div>
         </motion.div>
       </div>
