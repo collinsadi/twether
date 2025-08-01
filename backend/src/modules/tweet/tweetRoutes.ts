@@ -11,9 +11,6 @@ router.get("/health", (req: Request, res: Response) => {
 // Get tweets from database with pagination and filtering
 router.get("/", tweetController.getTweets);
 
-// Manually trigger tweet fetching (for testing)
-router.post("/fetch", tweetController.fetchTweets);
-
 
 
 // Get available topics
