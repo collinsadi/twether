@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { MinimalHeader } from '../../components/MinimalHeader';
+import { MinimalHeader, StatusBanner } from '../../components';
 import { TweetFeed } from '../../components/TweetFeed';
 import { MinimalFooter } from '../../components/MinimalFooter';
+import { statusConfig } from '../../config/statusConfig';
 
 export const Home = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -14,6 +15,13 @@ export const Home = () => {
         onFilterChange={setActiveFilter}
         activeFilter={activeFilter}
       />
+      {statusConfig.showBanner && (
+        <StatusBanner 
+          status={statusConfig.status}
+          message={statusConfig.message}
+          githubUrl={statusConfig.githubUrl}
+        />
+      )}
       <TweetFeed
         searchQuery={searchQuery}
         activeFilter={activeFilter}
