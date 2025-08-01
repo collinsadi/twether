@@ -67,7 +67,7 @@ const generateMockTweets = (count: number, filter?: string): Tweet[] => {
     retweets: Math.floor(Math.random() * 500) + 10,
     replies: Math.floor(Math.random() * 100) + 5,
     category: filter && filter !== 'all' ? filter : categories[Math.floor(Math.random() * categories.length)],
-    url: Math.random() > 0.5 ? 'https://twitter.com' : undefined,
+    url: 'https://twitter.com', // Always provide a URL
     image: Math.random() > 0.6 ? mockImages[Math.floor(Math.random() * mockImages.length)] : undefined
   }));
 

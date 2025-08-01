@@ -3,11 +3,11 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "lint": "eslint .",
-    "preview": "vite preview"
+ "scripts": {
+    "start": "node -r tsconfig-paths/register dist/index.js",
+    "dev": "ts-node-dev -r tsconfig-paths/register src/index.ts",
+    "build": "tsc",
+    "clean": "rm -rf dist"
   },
   "dependencies": {
     "@types/node": "^24.1.0",

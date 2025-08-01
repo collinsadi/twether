@@ -1,0 +1,44 @@
+{
+  "name": "twether",
+  "version": "1.0.0",
+  "description": "a feed of all ethereum related tweets",
+  "main": "src/index.ts",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/collinsadi/twether.git"
+  },
+  "keywords": [
+    "eth",
+    "ethereum",
+    "twether"
+  ],
+  "author": "Collins Adi",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/collinsadi/twether/issues"
+  },
+  "homepage": "https://github.com/collinsadi/twether#readme",
+  "dependencies": {
+    "@types/express": "^5.0.3",
+    "@types/node-cron": "^3.0.11",
+    "axios": "^1.11.0",
+    "concurrently": "^9.2.0",
+    "dotenv": "^17.2.1",
+    "express": "^5.1.0",
+    "groq-sdk": "^0.29.0",
+    "mongoose": "^8.17.0",
+    "node-cron": "^4.2.1",
+    "socket.io": "^4.8.1",
+    "ts-node-dev": "^2.0.0",
+    "winston": "^3.17.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.1.0",
+    "nodemon": "^3.1.10",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.2"
+  }
+}
