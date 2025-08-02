@@ -2,7 +2,7 @@ import { motion } from 'framer-motion';
 import { AlertTriangle, Github, ExternalLink } from 'lucide-react';
 
 interface StatusBannerProps {
-  status?: 'maintenance' | 'offline';
+  status?: 'maintenance' | 'offline' | 'beta';
   message?: string;
   githubUrl?: string;
 }
@@ -14,6 +14,7 @@ export const StatusBanner = ({
 }: StatusBannerProps) => {
   const isMaintenance = status === 'maintenance';
   const isOffline = status === 'offline';
+  const isBeta = status === 'beta';
   
   return (
     <motion.div
@@ -23,8 +24,10 @@ export const StatusBanner = ({
         isOffline
           ? 'bg-gradient-to-r from-red-500/20 to-red-600/20 border-b border-red-500/30'
           : isMaintenance 
-            ? 'bg-gradient-to-r from-orange-500/20 to-red-500/20 border-b border-orange-500/30' 
-            : 'bg-gradient-to-r from-blue-500/20 to-purple-500/20 border-b border-blue-500/30'
+            ? 'bg-gradient-to-r from-orange-500/20 to-red-500/20 border-b border-orange-500/30'
+            : isBeta
+              ? 'bg-gradient-to-r from-purple-500/20 to-blue-500/20 border-b border-purple-500/30'
+              : 'bg-gradient-to-r from-blue-500/20 to-purple-500/20 border-b border-blue-500/30'
       }`}
     >
       <div className="absolute inset-0 opacity-10">
@@ -38,21 +41,23 @@ export const StatusBanner = ({
               isOffline
                 ? 'bg-red-500/20 text-red-300 border border-red-500/30'
                 : isMaintenance 
-                  ? 'bg-orange-500/20 text-orange-300 border border-orange-500/30' 
-                  : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                  ? 'bg-orange-500/20 text-orange-300 border border-orange-500/30'
+                  : isBeta
+                    ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                    : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
             }`}>
               <AlertTriangle className="w-3 h-3" />
               <span className="hidden sm:inline">
-                {isOffline ? 'OFFLINE' : isMaintenance ? 'MAINTENANCE' : ''}
+                {isOffline ? 'OFFLINE' : isMaintenance ? 'MAINTENANCE' : isBeta ? 'BETA' : ''}
               </span>
               <span className="sm:hidden">
-                {isOffline ? 'OFF' : isMaintenance ? 'MAINTENANCE' : ''}
+                {isOffline ? 'OFF' : isMaintenance ? 'MAINTENANCE' : isBeta ? 'BETA' : ''}
               </span>
             </div>
             
             <div className="flex-1 min-w-0 hidden sm:block">
               <p className={`text-sm sm:text-base font-medium truncate ${
-                isOffline ? 'text-red-200' : isMaintenance ? 'text-orange-200' : 'text-blue-200'
+                isOffline ? 'text-red-200' : isMaintenance ? 'text-orange-200' : isBeta ? 'text-purple-200' : 'text-blue-200'
               }`}>
                 {message}
               </p>
@@ -69,8 +74,10 @@ export const StatusBanner = ({
               isOffline
                 ? 'bg-red-500/20 text-red-300 hover:bg-red-500/30 border border-red-500/30'
                 : isMaintenance 
-                  ? 'bg-orange-500/20 text-orange-300 hover:bg-orange-500/30 border border-orange-500/30' 
-                  : 'bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 border border-blue-500/30'
+                  ? 'bg-orange-500/20 text-orange-300 hover:bg-orange-500/30 border border-orange-500/30'
+                  : isBeta
+                    ? 'bg-purple-500/20 text-purple-300 hover:bg-purple-500/30 border border-purple-500/30'
+                    : 'bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 border border-blue-500/30'
             }`}
           >
             <Github className="w-4 h-4" />
@@ -85,8 +92,10 @@ export const StatusBanner = ({
         isOffline
           ? 'bg-gradient-to-r from-transparent via-red-500/50 to-transparent'
           : isMaintenance 
-            ? 'bg-gradient-to-r from-transparent via-orange-500/50 to-transparent' 
-            : 'bg-gradient-to-r from-transparent via-blue-500/50 to-transparent'
+            ? 'bg-gradient-to-r from-transparent via-orange-500/50 to-transparent'
+            : isBeta
+              ? 'bg-gradient-to-r from-transparent via-purple-500/50 to-transparent'
+              : 'bg-gradient-to-r from-transparent via-blue-500/50 to-transparent'
       }`}></div>
     </motion.div>
   );
