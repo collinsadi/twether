@@ -206,9 +206,11 @@ export const TweetFeed = ({ searchQuery, activeFilter }: TweetFeedProps) => {
             </p>
           </motion.div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+          <div className="columns-1 md:columns-2 gap-4 sm:gap-6 space-y-4 sm:space-y-6">
             {tweets.map((tweet) => (
-              <TweetCard key={tweet._id} tweet={tweet} />
+              <div key={tweet._id} className="break-inside-avoid">
+                <TweetCard tweet={tweet} />
+              </div>
             ))}
           </div>
         )}

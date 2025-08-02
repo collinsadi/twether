@@ -21,6 +21,13 @@ export const TweetCard = ({ tweet }: TweetCardProps) => {
     return date.toLocaleDateString();
   };
 
+  const truncateText = (text: string) => {
+    // Use longer limit for tweets without media, shorter for tweets with media
+    const maxLength = tweet.mediaPreviewUrl ? 200 : 450;
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + '...';
+  };
+
   const isVideo = tweet.mediaType === 'video' || tweet.mediaType === 'animated_gif';
 
   return (
@@ -30,7 +37,7 @@ export const TweetCard = ({ tweet }: TweetCardProps) => {
       exit={{ opacity: 0, y: -20 }}
       whileHover={{ y: -4, scale: 1.02 }}
       transition={{ duration: 0.2 }}
-      className="group relative bg-black border border-white/5 rounded-2xl p-4 sm:p-6 transition-all duration-300 hover:border-white/15 hover:bg-white/[0.02]"
+      className="group relative bg-black border border-white/5 rounded-2xl p-4 sm:p-6 transition-all duration-300 hover:border-white/15 hover:bg-white/[0.02] h-fit"
     >
       {/* Tweet Header */}
       <div className="flex items-start justify-between mb-3 sm:mb-4">
@@ -110,7 +117,7 @@ export const TweetCard = ({ tweet }: TweetCardProps) => {
 
       {/* Tweet Content */}
       <p className="text-white leading-relaxed mb-4 text-sm sm:text-base">
-        {tweet.tweetText}
+        {truncateText(tweet.tweetText)}
       </p>
 
       {/* Media Preview */}
