@@ -96,8 +96,8 @@ export const MinimalHeader = ({ onSearch, onFilterChange, activeFilter }: Minima
         {/* Logo and Search */}
         <div className="flex items-center justify-between mb-3 sm:mb-4">
           <div className="flex items-center space-x-2 sm:space-x-3">
-            <div className="w-7 h-7 sm:w-8 sm:h-8 bg-white rounded-lg flex items-center justify-center">
-              <FaFeatherAlt className="w-4 h-4 sm:w-5 sm:h-5 text-black" />
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center">
+              <FaFeatherAlt className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
             </div>
             <span className="text-lg sm:text-xl font-semibold">Twether</span>
             <div className="flex items-center space-x-1">

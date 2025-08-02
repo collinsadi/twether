@@ -1,5 +1,6 @@
-import { motion } from 'framer-motion';
-import { Heart, Twitter } from 'lucide-react';
+import { motion } from "framer-motion";
+import { Heart } from "lucide-react";
+import { FaGlobeAfrica } from "react-icons/fa";
 
 export const MinimalFooter = () => {
   return (
@@ -12,20 +13,21 @@ export const MinimalFooter = () => {
         <div className="flex items-center justify-center space-x-1 sm:space-x-2 text-xs sm:text-sm text-gray-500">
           <span>created with</span>
           <Heart className="w-3 h-3 sm:w-4 sm:h-4 text-red-500 fill-current" />
-          <span>collinsadi</span>
+          <span>by collinsadi</span>
           <span className="hidden sm:inline">•</span>
           <motion.a
-            href="https://twitter.com/collinsadi"
+            href="https://collinsadi.xyz"
             target="_blank"
             rel="noopener noreferrer"
             whileHover={{ scale: 1.1 }}
             className="flex items-center space-x-1 text-gray-500 hover:text-white transition-colors"
           >
-            <Twitter className="w-3 h-3 sm:w-4 sm:h-4" />
+            <FaGlobeAfrica className="w-3 h-3 sm:w-4 sm:h-4 text-gray-500" />
+
             <span className="hidden sm:inline">@collinsadi</span>
           </motion.a>
         </div>
       </div>
     </motion.footer>
   );
-}; 
+};
