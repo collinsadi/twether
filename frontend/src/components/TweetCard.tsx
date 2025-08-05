@@ -1,6 +1,7 @@
-import { motion } from 'framer-motion';
-import { Eye, Play, CheckCircle } from 'lucide-react';
-import type { Tweet } from '../services/api';
+import { motion } from "framer-motion";
+import { Eye, Play } from "lucide-react";
+import type { Tweet } from "../services/api";
+import { MdVerified } from "react-icons/md";
 
 interface TweetCardProps {
   tweet: Tweet;
@@ -10,14 +11,16 @@ export const TweetCard = ({ tweet }: TweetCardProps) => {
   const formatTimestamp = (timestamp: string) => {
     const date = new Date(timestamp);
     const now = new Date();
-    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
-    
-    if (diffInHours < 1) return 'Just now';
+    const diffInHours = Math.floor(
+      (now.getTime() - date.getTime()) / (1000 * 60 * 60)
+    );
+
+    if (diffInHours < 1) return "Just now";
     if (diffInHours < 24) return `${diffInHours}h ago`;
-    
+
     const diffInDays = Math.floor(diffInHours / 24);
     if (diffInDays < 7) return `${diffInDays}d ago`;
-    
+
     return date.toLocaleDateString();
   };
 
@@ -25,10 +28,11 @@ export const TweetCard = ({ tweet }: TweetCardProps) => {
     // Use longer limit for tweets without media, shorter for tweets with media
     const maxLength = tweet.mediaPreviewUrl ? 200 : 450;
     if (text.length <= maxLength) return text;
-    return text.substring(0, maxLength) + '...';
+    return text.substring(0, maxLength) + "...";
   };
 
-  const isVideo = tweet.mediaType === 'video' || tweet.mediaType === 'animated_gif';
+  const isVideo =
+    tweet.mediaType === "video" || tweet.mediaType === "animated_gif";
 
   return (
     <motion.div
@@ -50,7 +54,7 @@ export const TweetCard = ({ tweet }: TweetCardProps) => {
               className="w-full h-full object-cover"
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
-                target.style.display = 'none';
+                target.style.display = "none";
                 target.parentElement!.innerHTML = `
                   <div class="w-full h-full bg-gradient-to-br from-white/10 to-white/5 rounded-full flex items-center justify-center text-white font-semibold text-base sm:text-lg">
                     ${tweet.authorName.charAt(0)}
@@ -59,32 +63,39 @@ export const TweetCard = ({ tweet }: TweetCardProps) => {
               }}
             />
           </div>
-          
+
           <div className="flex-1 min-w-0">
             <div className="flex items-center space-x-1 sm:space-x-2 mb-1 sm:mb-2 flex-wrap">
               <h3 className="font-semibold text-white truncate text-sm sm:text-base">
                 {tweet.authorName}
               </h3>
-              
+
               {/* Verified Badge */}
-              {tweet.isVerified && (
-                <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4 text-white flex-shrink-0" />
+              {tweet.isVerified && tweet.verifiedType !== "Business" && (
+                <MdVerified className="w-3 h-3 sm:w-4 sm:h-4 text-[#1c9bef] flex-shrink-0" />
               )}
-              
+
+              {/* Business Account Badge */}
+              {tweet.verifiedType === "Business" && (
+                <MdVerified className="w-3 h-3 sm:w-4 sm:h-4 text-[#e8c636] flex-shrink-0" />
+              )}
+
               <span className="text-gray-500 text-xs sm:text-sm hidden sm:inline">
                 @{tweet.username}
               </span>
-              <span className="text-gray-500 text-xs sm:text-sm hidden sm:inline">•</span>
+              <span className="text-gray-500 text-xs sm:text-sm hidden sm:inline">
+                •
+              </span>
               <span className="text-gray-500 text-xs sm:text-sm">
                 {formatTimestamp(tweet.createdAt)}
               </span>
             </div>
-            
+
             {/* Topics */}
             {tweet.topics && tweet.topics.length > 0 && (
               <div className="flex flex-wrap gap-1">
                 {tweet.topics.slice(0, 2).map((topic, index) => (
-                  <span 
+                  <span
                     key={index}
                     className="inline-block px-2 sm:px-3 py-1 bg-white/5 text-white/70 text-xs rounded-full border border-white/10"
                   >
@@ -100,7 +111,7 @@ export const TweetCard = ({ tweet }: TweetCardProps) => {
             )}
           </div>
         </div>
-        
+
         <div className="flex items-center ml-2">
           <motion.a
             href={tweet.tweetUrl}
@@ -130,10 +141,10 @@ export const TweetCard = ({ tweet }: TweetCardProps) => {
               className="w-full h-48 sm:h-56 object-cover transition-transform duration-300 group-hover:scale-105"
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
-                target.style.display = 'none';
+                target.style.display = "none";
               }}
             />
-            
+
             {/* Play Button for Videos */}
             {isVideo && (
               <div className="absolute inset-0 flex items-center justify-center">
@@ -142,7 +153,7 @@ export const TweetCard = ({ tweet }: TweetCardProps) => {
                 </div>
               </div>
             )}
-            
+
             <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
           </div>
         </div>
@@ -152,4 +163,4 @@ export const TweetCard = ({ tweet }: TweetCardProps) => {
       <div className="absolute inset-0 rounded-2xl border border-white/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
     </motion.div>
   );
-}; 
+};
