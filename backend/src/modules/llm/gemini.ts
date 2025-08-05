@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI, GenerativeModel } from "@google/generative-ai";
+import logger from "../../common/resources/logger";
 
 // Environment configuration for Gemini
 export const GEMINI_CONFIG = {
@@ -122,5 +123,5 @@ try {
     initializeGemini();
   }
 } catch (error) {
-  console.warn("Gemini initialization failed:", error);
+  logger.warn("Gemini initialization failed:", error);
 }
