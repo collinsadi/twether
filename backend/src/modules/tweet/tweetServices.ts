@@ -116,8 +116,10 @@ export class TweetMonitoringService {
    */
   private emitTweet(tweet: SimplifiedTweet): void {
     if (this.io) {
-      this.io.emit('newTweet', tweet);
-      console.log(`📡 Emitted new tweet: ${tweet.tweetText.substring(0, 50)}...`);
+      this.io.emit("newTweet", tweet);
+      logger.info(
+        `📡 Emitted new tweet: ${tweet.tweetText.substring(0, 50)}...`
+      );
     }
   }
 
@@ -133,7 +135,7 @@ export class TweetMonitoringService {
       // Try multiple possible paths for different environments
       const possiblePaths = [
         path.join(__dirname, "../../users.json"), // Development: src/modules/tweet -> src/
-        path.join(__dirname, "../users.json"),    // Production: dist/modules/tweet -> dist/
+        path.join(__dirname, "../users.json"), // Production: dist/modules/tweet -> dist/
         path.join(process.cwd(), "src/users.json"), // Fallback: project root -> src/
         path.join(process.cwd(), "dist/users.json"), // Fallback: project root -> dist/
       ];
@@ -146,7 +148,7 @@ export class TweetMonitoringService {
           if (fs.existsSync(filePath)) {
             usersData = fs.readFileSync(filePath, "utf8");
             usedPath = filePath;
-            console.log(`✅ Found users.json at: ${filePath}`);
+            logger.info(`✅ Found users.json at: ${filePath}`);
             break;
           }
         } catch (err) {
@@ -155,15 +157,19 @@ export class TweetMonitoringService {
       }
 
       if (!usersData) {
-        throw new Error(`Could not find users.json in any of the expected locations: ${possiblePaths.join(", ")}`);
+        throw new Error(
+          `Could not find users.json in any of the expected locations: ${possiblePaths.join(
+            ", "
+          )}`
+        );
       }
 
       const parsedUsers = JSON.parse(usersData);
       this.usersCache = Array.isArray(parsedUsers) ? parsedUsers : [];
-      console.log(`📋 Loaded ${this.usersCache.length} users from ${usedPath}`);
+      logger.info(`📋 Loaded ${this.usersCache.length} users from ${usedPath}`);
       return this.usersCache;
     } catch (error) {
-      console.error("Error reading users.json:", error);
+      logger.error("Error reading users.json:", error);
       return [];
     }
   }
@@ -194,7 +200,7 @@ export class TweetMonitoringService {
           username,
           lastCheckedAt: defaultTime,
         });
-        console.log(
+        logger.info(
           `Created new last checked record for ${username} with default time: ${defaultTime}`
         );
       }
@@ -203,7 +209,7 @@ export class TweetMonitoringService {
       this.lastCheckedCache.set(username, lastChecked.lastCheckedAt);
       return lastChecked.lastCheckedAt;
     } catch (error) {
-      console.error(`Error getting last checked time for ${username}:`, error);
+      logger.error(`Error getting last checked time for ${username}:`, error);
       // Fallback to 24 hours ago if there's an error
       const fallbackTime = new Date(Date.now() - 24 * 60 * 60 * 1000);
       this.lastCheckedCache.set(username, fallbackTime);
@@ -224,9 +230,9 @@ export class TweetMonitoringService {
       );
       // Update cache
       this.lastCheckedCache.set(username, newTime);
-      console.log(`Updated last checked time for ${username} to ${newTime}`);
+      logger.info(`Updated last checked time for ${username} to ${newTime}`);
     } catch (error) {
-      console.error(`Error updating last checked time for ${username}:`, error);
+      logger.error(`Error updating last checked time for ${username}:`, error);
     }
   }
 
@@ -234,7 +240,7 @@ export class TweetMonitoringService {
    * Rate limiting utility
    */
   private async delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   /**
@@ -280,13 +286,15 @@ export class TweetMonitoringService {
   /**
    * Batch analyze tweets using AI for better performance
    */
-  private async batchAnalyzeTweets(tweets: SimplifiedTweet[]): Promise<SimplifiedTweet[]> {
+  private async batchAnalyzeTweets(
+    tweets: SimplifiedTweet[]
+  ): Promise<SimplifiedTweet[]> {
     const filteredTweets: SimplifiedTweet[] = [];
-    
+
     // Process tweets in batches
     for (let i = 0; i < tweets.length; i += this.batchSize) {
       const batch = tweets.slice(i, i + this.batchSize);
-      
+
       // Analyze batch in parallel
       const analysisPromises = batch.map(async (tweet) => {
         try {
@@ -301,25 +309,28 @@ export class TweetMonitoringService {
             analysis.impact !== "low" &&
             analysis.topics &&
             analysis.topics.length > 0 &&
-            (analysis.sentiment === "positive" || analysis.sentiment === "neutral")
+            (analysis.sentiment === "positive" ||
+              analysis.sentiment === "neutral")
           ) {
             tweet.topics = analysis.topics;
-            
+
             // Emit tweet in real-time when it matches criteria
             this.emitTweet(tweet);
-            
+
             return tweet;
           }
           return null;
         } catch (error) {
-          console.error(`Error analyzing tweet:`, error);
+          logger.error(`Error analyzing tweet:`, error);
           return null;
         }
       });
 
       // Wait for batch analysis to complete
       const results = await Promise.all(analysisPromises);
-      const validTweets = results.filter(tweet => tweet !== null) as SimplifiedTweet[];
+      const validTweets = results.filter(
+        (tweet) => tweet !== null
+      ) as SimplifiedTweet[];
       filteredTweets.push(...validTweets);
 
       // Add delay between batches to avoid rate limiting
@@ -339,23 +350,25 @@ export class TweetMonitoringService {
 
     try {
       // Use bulkWrite for better performance
-      const operations = tweets.map(tweet => ({
+      const operations = tweets.map((tweet) => ({
         insertOne: {
-          document: tweet
-        }
+          document: tweet,
+        },
       }));
 
       await Tweet.bulkWrite(operations, {
-        ordered: false, 
-        writeConcern: { w: 1 }
+        ordered: false,
+        writeConcern: { w: 1 },
       });
 
-      console.log(`Successfully inserted ${tweets.length} tweets in batch`);
+      logger.info(`Successfully inserted ${tweets.length} tweets in batch`);
     } catch (error: any) {
       if (error.code === 11000) {
-        console.log(`Some tweets were already in the database (duplicate key error)`);
+        logger.info(
+          `Some tweets were already in the database (duplicate key error)`
+        );
       } else {
-        console.error(`Error batch inserting tweets:`, error);
+        logger.error(`Error batch inserting tweets:`, error);
       }
     }
   }
@@ -370,7 +383,7 @@ export class TweetMonitoringService {
       const sinceDate = this.formatDateForTwitterAPI(lastCheckedTime);
 
       const query = `from:${user} since:${sinceDate}`;
-      console.log(
+      logger.info(
         `Querying tweets for ${user} since ${sinceDate} (last checked: ${lastCheckedTime})`
       );
 
@@ -382,7 +395,7 @@ export class TweetMonitoringService {
       });
 
       const tweets = response.data.tweets || [];
-      console.log(`Found ${tweets.length} new tweets for ${user}`);
+      logger.info(`Found ${tweets.length} new tweets for ${user}`);
 
       if (tweets.length === 0) {
         // Update last checked time even if no tweets found
@@ -392,7 +405,7 @@ export class TweetMonitoringService {
 
       // Debug: Log the first tweet
       if (tweets.length > 0) {
-        console.log(`First tweet for ${user}:`, {
+        logger.info(`First tweet for ${user}:`, {
           id: tweets[0].id,
           createdAt: tweets[0].createdAt || tweets[0].created_at,
           text: tweets[0].text?.substring(0, 100) + "...",
@@ -412,7 +425,7 @@ export class TweetMonitoringService {
 
       return filteredTweets;
     } catch (error) {
-      console.error(`Error fetching tweets for ${user}:`, error);
+      logger.error(`Error fetching tweets for ${user}:`, error);
       return [];
     }
   }
@@ -427,7 +440,8 @@ export class TweetMonitoringService {
 
     // Process users in parallel with rate limiting
     const userBatches = [];
-    for (let i = 0; i < users.length; i += 3) { // Process 3 users at a time
+    for (let i = 0; i < users.length; i += 3) {
+      // Process 3 users at a time
       userBatches.push(users.slice(i, i + 3));
     }
 
@@ -439,7 +453,7 @@ export class TweetMonitoringService {
       });
 
       const batchResults = await Promise.all(batchPromises);
-      
+
       // Flatten results
       const batchTweets = batchResults.flat();
       allTweets.push(...batchTweets);
@@ -455,7 +469,7 @@ export class TweetMonitoringService {
       await this.batchInsertTweets(allTweets);
     }
 
-    console.log(`Total tweets processed: ${allTweets.length}`);
+    logger.info(`Total tweets processed: ${allTweets.length}`);
     return allTweets;
   }
 
@@ -474,7 +488,7 @@ export class TweetMonitoringService {
         lastCheckedAt: record.lastCheckedAt,
       }));
     } catch (error) {
-      console.error("Error getting last checked times:", error);
+      logger.error("Error getting last checked times:", error);
       return [];
     }
   }
@@ -493,12 +507,9 @@ export class TweetMonitoringService {
         { lastCheckedAt: resetDate },
         { upsert: true, new: true }
       );
-      console.log(`Reset last checked time for ${username} to ${resetDate}`);
+      logger.info(`Reset last checked time for ${username} to ${resetDate}`);
     } catch (error) {
-      console.error(
-        `Error resetting last checked time for ${username}:`,
-        error
-      );
+      logger.error(`Error resetting last checked time for ${username}:`, error);
     }
   }
 
@@ -520,7 +531,7 @@ export class TweetMonitoringService {
 
       for (const format of formats) {
         const query = `from:${username} since:${format}`;
-        console.log(`Testing query: ${query}`);
+        logger.info(`Testing query: ${query}`);
 
         try {
           const response = await twitterApi.get(`/advanced_search`, {
@@ -559,7 +570,7 @@ export class TweetMonitoringService {
         results,
       };
     } catch (error) {
-      console.error(`Error testing API query for ${username}:`, error);
+      logger.error(`Error testing API query for ${username}:`, error);
       return {
         error: error instanceof Error ? error.message : "Unknown error",
       };
