@@ -1,15 +1,16 @@
 import mongoose from "mongoose";
 import { ENVIRONMENT } from "./environment";
+import logger from "../resources/logger";
 
 export const connectDb = async (): Promise<void> => {
   try {
     const conn = await mongoose.connect(String(ENVIRONMENT.DB.URL));
-    console.log("MongoDB Connected: " + conn.connection.host);
+    logger.info("MongoDB Connected: " + conn.connection.host);
   } catch (error) {
     if (error instanceof Error) {
-      console.log("Error: " + error.message);
+      logger.error("Error: " + error.message);
     } else {
-      console.log("An unknown error occurred.");
+      logger.error("An unknown error occurred.");
     }
     process.exit(1);
   }
