@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { Tweet } from "../../schemas/TweetSchema";
+import logger from "../../common/resources/logger";
 
 class TweetController {
   private static instance: TweetController;
@@ -34,8 +35,8 @@ class TweetController {
         };
       }
 
-      console.log("🔍 Filter:", JSON.stringify(filter, null, 2));
-      console.log("📄 Page:", page, "Limit:", limit, "Topic:", topic);
+      logger.info("🔍 Filter:", JSON.stringify(filter, null, 2));
+      logger.info("📄 Page:", page, "Limit:", limit, "Topic:", topic);
 
       // Fetch tweets from database with pagination and filtering
       const tweets = await Tweet.find(filter)
@@ -44,7 +45,7 @@ class TweetController {
         .limit(limit)
         .lean();
 
-      console.log("📊 Found tweets:", tweets.length);
+      logger.info("📊 Found tweets:", tweets.length);
 
       // Get total count for pagination info
       const totalTweets = await Tweet.countDocuments(filter);
@@ -65,7 +66,7 @@ class TweetController {
         },
       });
     } catch (error) {
-      console.error("Error in getTweets:", error);
+      logger.error("Error in getTweets:", error);
       res.status(500).json({
         success: false,
         message: "Error fetching tweets",
@@ -92,7 +93,7 @@ class TweetController {
         data: uniqueTopics,
       });
     } catch (error) {
-      console.error("Error in getTopics:", error);
+      logger.error("Error in getTopics:", error);
       res.status(500).json({
         success: false,
         message: "Error fetching topics",
