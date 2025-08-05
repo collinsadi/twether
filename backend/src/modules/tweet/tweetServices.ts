@@ -293,7 +293,7 @@ export class TweetMonitoringService {
           const analysis = JSON.parse(analysisResult);
 
           // logging the analysis result so that it can be viewwed from my VPS
-          console.log(analysis);
+          console.log("🔍 analysis result: ", analysis);
 
           // Check if tweet meets criteria
           if (
