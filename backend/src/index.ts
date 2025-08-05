@@ -8,6 +8,7 @@ import cors from "cors";
 import tweetRoutes from "./modules/tweet/tweetRoutes";
 import cron from "node-cron";
 import { TweetMonitoringService } from "./modules/tweet/tweetServices";
+import logger from "./common/resources/logger";
 
 dotenv.config();
 
@@ -33,24 +34,32 @@ const tweetService = TweetMonitoringService.getInstance();
 tweetService.setSocketIO(io);
 
 // Setup cron job to fetch tweets every 10 minutes (only if RUN_CRON is true)
-const shouldRunCron = process.env.RUN_CRON === 'true';
+const shouldRunCron = process.env.RUN_CRON === "true";
 
 if (shouldRunCron) {
-  cron.schedule('*/10 * * * *', async () => {
-    console.log('🔄 Running scheduled tweet fetch...');
-    try {
-      const tweets = await tweetService.getTweetsForUsers();
-      console.log(`✅ Scheduled fetch completed. Found ${tweets.length} tweets.`);
-    } catch (error) {
-      console.error('❌ Error in scheduled tweet fetch:', error);
+  cron.schedule(
+    "*/10 * * * *",
+    async () => {
+      logger.info("🔄 Running scheduled tweet fetch...");
+      try {
+        const tweets = await tweetService.getTweetsForUsers();
+        logger.info(
+          `✅ Scheduled fetch completed. Found ${tweets.length} tweets.`
+        );
+      } catch (error) {
+        logger.error("❌ Error in scheduled tweet fetch:", error);
+      }
+    },
+    {
+      timezone: "UTC",
     }
-  }, {
-    timezone: "UTC"
-  });
+  );
 
-  console.log('⏰ Cron job scheduled: Tweet fetching every 10 minutes');
+  logger.info("⏰ Cron job scheduled: Tweet fetching every 10 minutes");
 } else {
-  console.log('⏰ Cron job disabled: RUN_CRON environment variable is not set to "true"');
+  logger.info(
+    '⏰ Cron job disabled: RUN_CRON environment variable is not set to "true"'
+  );
 }
 
 // API Routes
@@ -62,24 +71,24 @@ app.get("/api/health", (req: Request, res: Response) => {
 app.use("/api/tweets", tweetRoutes);
 
 // Socket.IO connection handling
-io.on('connection', (socket) => {
-  console.log(`🔌 Client connected: ${socket.id}`);
-  
-  socket.on('disconnect', () => {
-    console.log(`🔌 Client disconnected: ${socket.id}`);
+io.on("connection", (socket) => {
+  logger.info(`🔌 Client connected: ${socket.id}`);
+
+  socket.on("disconnect", () => {
+    logger.info(`🔌 Client disconnected: ${socket.id}`);
   });
 });
 
 httpServer.listen(ENVIRONMENT.APP.PORT, async () => {
-  console.log(
+  logger.info(
     `${ENVIRONMENT.APP.NAME} Running on http://localhost:${ENVIRONMENT.APP.PORT}`
   );
 
   // Connect to database
   try {
     await connectDb();
-    console.log("✅ Database connected successfully");
+    logger.info("✅ Database connected successfully");
   } catch (error) {
-    console.error("❌ Failed to connect to database:", error);
+    logger.error("❌ Failed to connect to database:", error);
   }
 });
