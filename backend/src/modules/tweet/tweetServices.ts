@@ -5,6 +5,7 @@ import { Tweet } from "../../schemas/TweetSchema";
 import { LastChecked } from "../../schemas/LastCheckedSchema";
 import { analyzeTweet } from "../llm/gemini";
 import { Server as SocketIOServer } from "socket.io";
+import logger from "../../common/resources/logger";
 
 interface Tweet {
   id: string;
@@ -293,7 +294,7 @@ export class TweetMonitoringService {
           const analysis = JSON.parse(analysisResult);
 
           // logging the analysis result so that it can be viewwed from my VPS
-          console.log("🔍 analysis result: ", analysis);
+          logger.info("🔍 analysis result: ", analysis);
 
           // Check if tweet meets criteria
           if (
