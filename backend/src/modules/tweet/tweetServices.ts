@@ -292,6 +292,9 @@ export class TweetMonitoringService {
           const analysisResult = await analyzeTweet(tweet.tweetText);
           const analysis = JSON.parse(analysisResult);
 
+          // logging the analysis result so that it can be viewwed from my VPS
+          console.log(analysis);
+
           // Check if tweet meets criteria
           if (
             analysis.impact !== "low" &&
