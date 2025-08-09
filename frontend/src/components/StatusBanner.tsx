@@ -1,5 +1,7 @@
 import { motion } from 'framer-motion';
-import { AlertTriangle, Github, ExternalLink } from 'lucide-react';
+import { AlertTriangle, Github, ExternalLink, Info } from 'lucide-react';
+import { useState } from 'react';
+import { ProjectStatusModal } from './ProjectStatusModal';
 
 interface StatusBannerProps {
   status?: 'maintenance' | 'offline' | 'beta';
@@ -12,6 +14,7 @@ export const StatusBanner = ({
   message = 'Service temporarily unavailable. Check back soon!',
   githubUrl = 'https://github.com/collinsadi/twether'
 }: StatusBannerProps) => {
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const isMaintenance = status === 'maintenance';
   const isOffline = status === 'offline';
   const isBeta = status === 'beta';
@@ -64,27 +67,41 @@ export const StatusBanner = ({
             </div>
           </div>
           
-          <motion.a
-            href={githubUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className={`flex items-center space-x-1 sm:space-x-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-              isOffline
-                ? 'bg-red-500/20 text-red-300 hover:bg-red-500/30 border border-red-500/30'
-                : isMaintenance 
-                  ? 'bg-orange-500/20 text-orange-300 hover:bg-orange-500/30 border border-orange-500/30'
-                  : isBeta
-                    ? 'bg-purple-500/20 text-purple-300 hover:bg-purple-500/30 border border-purple-500/30'
-                    : 'bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 border border-blue-500/30'
-            }`}
-          >
-            <Github className="w-4 h-4" />
-            <span className="hidden sm:inline">Contribute</span>
-            <span className="sm:hidden">Help</span>
-            <ExternalLink className="w-3 h-3" />
-          </motion.a>
+          <div className="flex items-center space-x-2">
+            {isMaintenance && (
+              <motion.button
+                onClick={() => setIsModalOpen(true)}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="flex items-center space-x-1 sm:space-x-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors bg-orange-500/20 text-orange-300 hover:bg-orange-500/30 border border-orange-500/30"
+              >
+                <Info className="w-4 h-4" />
+                <span>Details</span>
+              </motion.button>
+            )}
+            
+            <motion.a
+              href={githubUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className={`flex items-center space-x-1 sm:space-x-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                isOffline
+                  ? 'bg-red-500/20 text-red-300 hover:bg-red-500/30 border border-red-500/30'
+                  : isMaintenance 
+                    ? 'bg-orange-500/20 text-orange-300 hover:bg-orange-500/30 border border-orange-500/30'
+                    : isBeta
+                      ? 'bg-purple-500/20 text-purple-300 hover:bg-purple-500/30 border border-purple-500/30'
+                      : 'bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 border border-blue-500/30'
+              }`}
+            >
+              <Github className="w-4 h-4" />
+              <span className="hidden sm:inline">Contribute</span>
+              <span className="sm:hidden">Help</span>
+              <ExternalLink className="w-3 h-3" />
+            </motion.a>
+          </div>
         </div>
       </div>
       
@@ -97,6 +114,11 @@ export const StatusBanner = ({
               ? 'bg-gradient-to-r from-transparent via-purple-500/50 to-transparent'
               : 'bg-gradient-to-r from-transparent via-blue-500/50 to-transparent'
       }`}></div>
+      
+      <ProjectStatusModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+      />
     </motion.div>
   );
 }; 

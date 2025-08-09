@@ -8,8 +8,8 @@ export interface StatusConfig {
 // const isMaintenanceMode = import.meta.env.VITE_MAINTENANCE === 'true';
 
 export const statusConfig: StatusConfig = {
-  status: 'beta',
-  message: 'This is a beta version. Features may change and bugs may occur.',
+  status: 'maintenance',
+  message: 'Project is currently on hold. Click Details for more information.',
   githubUrl: 'https://github.com/collinsadi/twether',
   showBanner: true
 };
